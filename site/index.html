@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -17,6 +17,8 @@
 <!-- Leaflet 1.9.4 (pinned, jsDelivr) for the preview map, App Conventions §7 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- NOAA World Magnetic Model WMM-2025 via geomagnetism 0.2.0 (Apache-2.0), bundled: vendor/wmm.js (v0.18) -->
+<script src="vendor/wmm.js"></script>
 <style>
   :root{
     --bg-deep:#10141a;
@@ -148,6 +150,7 @@
   .map .leaflet-control-layers{ background:var(--bg-panel); color:var(--text-primary); border:1px solid var(--bezel-hi); font:12.5px 'IBM Plex Sans', sans-serif; }
   .map .leaflet-control-attribution{ background:rgba(16,20,26,.8); color:var(--text-muted); font-size:10px; }
   .map .leaflet-control-attribution a{ color:var(--teal); }
+  .end-handle{ width:18px; height:18px; border-radius:50%; background:rgba(16,20,26,.55); border:3px solid #f5a623; box-shadow:0 0 0 1px #000; cursor:grab; }
   .map .leaflet-bar a.fit-btn{ display:flex; align-items:center; justify-content:center; }
   .map .leaflet-bar a{ background:var(--bg-panel); color:var(--text-primary); border-bottom-color:var(--bezel-hi); }
   .map .leaflet-control-scale-line{ background:rgba(16,20,26,.75); color:var(--text-primary); border-color:var(--text-muted); }
@@ -226,7 +229,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.17</span>
+    <span class="ver mono">v0.18</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -299,7 +302,7 @@
         <div class="map" id="map" role="region" aria-label="Preview map of the airfield KML"></div>
         <div class="legend" id="legend"></div>
         <div class="actions"><button class="btn" id="btnPick" type="button">Mark runway ends on the map</button></div>
-        <p class="hint" style="margin-top:6px">Use this when OpenStreetMap has no runway for this strip, or when its runway doesn't line up with the strip on the satellite view. Zoom in, tap the button, then tap each end of the runway. Your line replaces OpenStreetMap's runway; any ramp and taxiways stay. To undo it, use "Back to OpenStreetMap" in step 4. If the drawn runway already sits on the strip, you don't need this.</p>
+        <p class="hint" style="margin-top:6px">Use this when OpenStreetMap has no runway for this strip, or when its runway doesn't line up with the strip on the satellite view. You can also drag either amber end of the drawn runway. Zoom in, tap the button, then tap each end of the runway. Your line replaces OpenStreetMap's runway; any ramp and taxiways stay. To undo it, use "Back to OpenStreetMap" in step 4. If the drawn runway already sits on the strip, you don't need this.</p>
         <h2 style="margin-top:12px">Where each piece comes from</h2>
         <ul class="srcs" id="srcList"></ul>
         <div class="opts">
@@ -325,6 +328,7 @@
           <li><b>AFAC</b> (Agencia Federal de Aviación Civil), "Aeródromos y helipuertos" list on gob.mx: <span id="afacEdition">edition loading…</span></li>
           <li><b>ICAO check</b>: Mexico's official airport list, "Sistema Aeroportuario Mexicano" (<a href="https://www.gob.mx/cms/uploads/attachment/file/984099/sistema-aeroportuario-mexicano-14-marzo-2025-14032025.xlsx" target="_blank" rel="noopener">gob.mx, 14-Mar-2025 edition</a>), with positions and local codes from <a href="https://ourairports.com/data/" target="_blank" rel="noopener">OurAirports</a> (public domain). Both bundled into the app 14-Nov-2026.</li>
           <li><b>OpenStreetMap</b>: runway, ramp, taxiway and hangar shapes, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL. Read through the <a href="https://wiki.openstreetmap.org/wiki/Overpass_API" target="_blank" rel="noopener">Overpass API</a>. If a strip is missing there, adding it to OpenStreetMap helps every pilot who uses this app.</li>
+          <li><b>Magnetic variation</b>: NOAA/NGA World Magnetic Model WMM-2025, computed in the page with the <a href="https://github.com/naturalatlas/geomagnetism" target="_blank" rel="noopener">geomagnetism</a> library (Apache 2.0).</li>
           <li>With thanks to <a href="https://airports.robrc.net/" target="_blank" rel="noopener"><b>airports.robrc.net</b></a>, the public directory of Mexican airport infrastructure that showed the way to AFAC's data. Its map and its corrections to AFAC's figures are worth a look.</li>
         </ul>
       </div>
@@ -691,7 +695,10 @@
       geoMsg('warn', `OpenStreetMap didn't answer (${err}). Tap Retry in a minute, or mark the runway ends on the map below.`);
       $('checks').innerHTML = '<li class="warn"><button class="btn" id="btnRetry" type="button">Retry OpenStreetMap</button></li>';
       $('btnRetry').addEventListener('click', () => fetchOsm(true));
-      osm = null; geo = null; $('stepOut').hidden = false; draw();
+      osm = null; geo = null; $('stepOut').hidden = false; build();   // build() falls back to the starter runway
+      $('checks').insertAdjacentHTML('afterbegin', '<li class="warn"><button class="btn" id="btnRetry2" type="button">Retry OpenStreetMap</button></li>');
+      $('btnRetry2').addEventListener('click', () => fetchOsm(true));
+      geoMsg('warn', `OpenStreetMap didn't answer (${err}). Tap Retry in a minute, or use the starter runway / mark the ends on the map below.`);
       setSum('stepGeo', "OpenStreetMap didn't answer: Retry, or mark the ends on the map", 'warn'); setOpen('stepGeo', true); return;
     }
     try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), els: data.elements || [] })); } catch(e){}
@@ -742,6 +749,22 @@
     return { id:e.id, a, b, ref:t.ref || '', surface:t.surface || '', width, closed };
   }
 
+  // magnetic variation (east +) from NOAA's World Magnetic Model, or null if the model didn't load
+  const variation = (lat, lon) => { try { return window.WMM ? window.WMM.declination(lat, lon, new Date()) : null; } catch(e){ return null; } };
+  const varText = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'E' : 'W'}`;
+  const hdg3 = h => String(Math.round(((h % 360) + 360) % 360) || 360).padStart(3, '0');
+  // v0.18: a starter runway from AFAC's own figures when OpenStreetMap has none — centered on AFAC's point,
+  // along the lower runway number (magnetic) turned to true with WMM variation, AFAC's length. Drag the ends to fit.
+  function starterRunway(r){
+    if (r.lat == null || !r.len_m) return null;
+    const des = r.rwy.map(x => parseInt(x, 10)).filter(n => n >= 1 && n <= 36);
+    if (!des.length) return null;
+    const v = variation(r.lat, r.lon); if (v == null) return null;
+    const low = Math.min(...des), mag = low * 10, tru = (mag + v + 360) % 360, P = [r.lat, r.lon];
+    return { a:dest(P, (tru + 180) % 360, r.len_m / 2), b:dest(P, tru, r.len_m / 2), ref:'', surface:'', width:null, starter:true, id:null,
+             note:`RWY ${pad2(low)} = ${hdg3(mag)}° magnetic + ${varText(v)} variation = ${hdg3(tru)}° true` };
+  }
+
   // ---------- assemble geometry + checks ----------
   function build(){
     const r = rec, checks = [];
@@ -751,13 +774,21 @@
 
     if (manualEnds){
       runways = [{ a:manualEnds[0], b:manualEnds[1], ref:'', surface:'', width:null, manual:true }];
-      add('info', 'Runway from the ends you entered.');
+      add('info', 'Runway from the ends you placed. Drag either amber end on the map to adjust it.');
     } else if (osm && osm.runways.length){
       runways = osm.runways.slice();
       if (P) runways.sort((x, y) => Math.abs(track(x.a, x.b, P).cross) - Math.abs(track(y.a, y.b, P).cross));
       add('ok', `OpenStreetMap has ${runways.length === 1 ? 'a runway' : runways.length + ' runways'} here` + (osm.aerodrome?.name ? ` ("${esc(osm.aerodrome.name)}")` : '') + '.');
     } else if (osm){
       add('warn', 'OpenStreetMap has no runway within 2.5 km of AFAC\'s point. Enter the runway ends yourself (below), or add the strip to OpenStreetMap: <a target="_blank" rel="noopener" href="https://www.openstreetmap.org/edit#map=17/' + r.lat + '/' + r.lon + '">edit here</a>.');
+    }
+
+    if (!runways.length){
+      const st = starterRunway(r);
+      if (st){
+        runways = [st];
+        add('warn', `Starter runway drawn from AFAC's figures: centered on AFAC's point, ${st.note} (NOAA World Magnetic Model WMM-2025), ${r.len_m.toLocaleString()} m long. AFAC's point isn't always mid-runway, so check it on the satellite view and drag each amber end onto the strip's ends. Or send it as is.`);
+      }
     }
 
     // primary runway: label ends with AFAC designators (or OSM ref), compare figures
@@ -770,15 +801,23 @@
         const fit = n => Math.abs(angDiff(n * 10, tb));
         const [x, y] = fit(des[0]) <= fit(des[1]) ? [des[0], des[1]] : [des[1], des[0]];
         prim.labA = pad2(x); prim.labB = pad2(y);
-        const implied = angDiff(tb, x * 10);   // true − magnetic
-        add(Math.abs(implied) <= 25 ? 'info' : 'warn',
-          `Runway ${pad2(x)} points <span class="mono">${tb.toFixed(1)}°</span> true. Its number suggests magnetic variation of about <span class="mono">${Math.abs(implied).toFixed(0)}°${implied >= 0 ? 'E' : 'W'}</span> (±5°, since runway numbers are rounded). Compare it with the variation on your chart. A big difference means the shape or the runway numbers are off.`);
+        const v = P ? variation(P[0], P[1]) : null;
+        if (v != null && !prim.starter){
+          const mag = ((tb - v) % 360 + 360) % 360, num = Math.round(mag / 10) || 36, off = Math.abs(angDiff(mag, x * 10));
+          add(num === x ? 'ok' : (off <= 7 ? 'info' : 'warn'),
+            `Runway ${pad2(x)} points <span class="mono">${tb.toFixed(1)}°</span> true = <span class="mono">${mag.toFixed(1)}°</span> magnetic with this area's variation of ${varText(v)} (NOAA World Magnetic Model WMM-2025). `
+            + (num === x ? 'That matches the runway number.' : `A runway on that heading would be numbered ${pad2(num)}; AFAC numbers it ${pad2(x)}${off <= 7 ? ' (close: runway numbers are rounded and sometimes set by an older variation)' : '. Check the line on the satellite view'}.`));
+        } else if (!prim.starter){
+          const implied = angDiff(tb, x * 10);
+          add('info', `Runway ${pad2(x)} points <span class="mono">${tb.toFixed(1)}°</span> true. Its number suggests magnetic variation of about <span class="mono">${Math.abs(implied).toFixed(0)}°${implied >= 0 ? 'E' : 'W'}</span>. Compare it with the variation on your chart.`);
+        }
       } else if (prim.ref){ const pr = prim.ref.split('/'); prim.labA = pr[0]; prim.labB = pr[1]; }
-      if (r.len_m){
+      if (prim.starter){ /* drawn from AFAC's own figures: nothing to compare */ }
+      else if (r.len_m){
         const d = len - r.len_m, pct = d / r.len_m * 100;
         add(Math.abs(pct) <= 5 ? 'ok' : 'warn', `Length: map <span class="mono">${Math.round(len).toLocaleString()} m</span> vs AFAC <span class="mono">${r.len_m.toLocaleString()} m</span> (${d >= 0 ? '+' : ''}${Math.round(d)} m, ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%).`);
       } else add('info', `Length: map <span class="mono">${Math.round(len).toLocaleString()} m</span>. AFAC gives no length.`);
-      if (P){
+      if (P && !prim.starter){
         const tk = track(prim.a, prim.b, P);
         const onIt = Math.abs(tk.cross) <= Math.max(30, (r.wid_m || 20)) && tk.along >= -50 && tk.along <= tk.len + 50;
         add(onIt ? 'ok' : 'warn', `AFAC's reference point is <span class="mono">${Math.abs(tk.cross).toFixed(0)} m</span> from the runway centerline${onIt ? ', so the two sources agree on where the runway is' : '. Check the satellite view: one of the two sources may be off'}.`);
@@ -802,12 +841,12 @@
     {
       const warn = checks.some(c => c.startsWith('<li class="warn"'));
       const bits = [];
-      if (prim) bits.push(manualEnds ? 'Runway from your ends' : 'Runway from OpenStreetMap');
+      if (prim) bits.push(manualEnds ? 'Runway from your ends' : (prim.starter ? 'Starter runway from AFAC figures: drag the ends to fit' : 'Runway from OpenStreetMap'));
       else bits.push('No runway yet');
-      if (prim && r.len_m) bits.push(`length ${((dist(prim.a, prim.b) - r.len_m) / r.len_m * 100 >= 0 ? '+' : '')}${((dist(prim.a, prim.b) - r.len_m) / r.len_m * 100).toFixed(1)}% vs AFAC`);
+      if (prim && r.len_m && !prim.starter) bits.push(`length ${((dist(prim.a, prim.b) - r.len_m) / r.len_m * 100 >= 0 ? '+' : '')}${((dist(prim.a, prim.b) - r.len_m) / r.len_m * 100).toFixed(1)}% vs AFAC`);
       if (osm) bits.push(osm.aprons.length + osm.taxi.length ? 'ramp/taxiways mapped' : 'no ramp mapped');
       setSum('stepGeo', bits.join(' · ') + (warn ? ' · check the notes' : ''), warn ? 'warn' : (prim ? 'ok' : ''));
-      if (!prim) setOpen('stepGeo', true);
+      if (!prim || prim.starter) setOpen('stepGeo', true);
     }
     const rf = $('lnkRefresh'); if (rf) rf.addEventListener('click', e => { e.preventDefault(); fetchOsm(true); });
     geoMsg('', '');
@@ -907,11 +946,22 @@
         L.polygon(ll(x.poly), { color:'#ffffff', weight:1.5, fillColor:x.C.rwy, fillOpacity:1 }).bindTooltip(x.rw === pr && pr.labA ? `RWY ${pr.labA}/${pr.labB}` : 'Runway').addTo(overlay);
         L.polyline(ll([x.rw.a, x.rw.b]), { color:'#ffffff', weight:1, dashArray:'8 6' }).addTo(overlay);
       });
+      // v0.18: drag either end to move it (turns the runway into your own ends)
+      [['a', pr.a], ['b', pr.b]].forEach(([k, p]) => {
+        const m = L.marker(p, { draggable:true, autoPan:true, title:'Drag to the runway end', icon:L.divIcon({ className:'end-handle', iconSize:[18, 18], iconAnchor:[9, 9] }) }).addTo(overlay);
+        m.on('dragend', () => {
+          const ll = m.getLatLng(), q = [ll.lat, ll.lng];
+          const A = k === 'a' ? q : pr.a, B = k === 'b' ? q : pr.b;
+          manualEnds = [A, B];
+          $('endA').value = A[0].toFixed(6) + ', ' + A[1].toFixed(6); $('endB').value = B[0].toFixed(6) + ', ' + B[1].toFixed(6);
+          build();
+        });
+      });
       const lbl = (p, t) => L.marker(p, { interactive:false, icon:L.divIcon({ className:'rwy-lbl', html:esc(t), iconSize:[30, 16], iconAnchor:[15, 8] }) }).addTo(overlay);
       if (pr.labA) lbl(dest(pr.a, b + 180, 40), pr.labA);
       if (pr.labB) lbl(dest(pr.b, b, 40), pr.labB);
       if (rec.lat != null) L.circleMarker([rec.lat, rec.lon], { radius:6, color:'#3fa7a0', weight:2, fill:false }).bindTooltip(`AFAC reference point ${rec.lat.toFixed(5)}, ${rec.lon.toFixed(5)}`).addTo(overlay);
-      const key = (rec.des || '') + rec.name + (manualEnds ? 'm' : '');
+      const key = (rec.des || '') + rec.name;
       if (fitFor !== key){ fitFor = key; const all = [...(Ly.box || []), ...Ly.rwyPolys.flatMap(x => x.poly)]; map.fitBounds(L.latLngBounds(all), { padding:[24, 24], maxZoom:17 }); }
     }
     $('legend').innerHTML = `<span><i style="background:${Ly.C.rwy}"></i>Runway (${Ly.C.label})</span><span><i style="background:${Ly.C.ramp}"></i>Ramp / taxiways</span>${Ly.box ? `<span><i style="background:${Ly.C.box};opacity:.6"></i>Airfield box (+${Ly.margin} m)</span>` : ''}<span><i style="background:transparent;border:2px solid #3fa7a0;border-radius:50%"></i>AFAC point</span>`;
@@ -966,7 +1016,8 @@
     const afac = `<a href="${esc(DATA.source.url)}" target="_blank" rel="noopener">AFAC "Aeródromos y helipuertos" list</a>, ${esc(DATA.source.edition || 'current')} edition`;
     const items = [
       `<b>Name, reference point, elevation, runway numbers, length, width, surface, permit:</b> ${afac}. It's the same official list <a href="https://airports.robrc.net/?q=${encodeURIComponent(r.des || r.name)}&vigente=&view=map" target="_blank" rel="noopener">airports.robrc.net</a> uses (this app reads it straight from gob.mx, without robrc's corrections).`,
-      manualEnds ? `<b>Runway position and direction:</b> the runway ends you entered. Width from AFAC (${r.wid_m ?? 15} m).`
+      manualEnds ? `<b>Runway position and direction:</b> the runway ends you placed (tapped, dragged or typed). Width from AFAC (${r.wid_m ?? 15} m).`
+        : pr.starter ? `<b>Runway position and direction:</b> a starter line from AFAC's figures, centered on AFAC's point, ${esc(pr.note)} (NOAA WMM-2025 via the geomagnetism library), AFAC's length and width. Drag the ends onto the strip for a better fit.`
         : `<b>Runway position and direction:</b> OpenStreetMap ${osmWay(pr.id)}${geo.runways.length > 1 ? ` (+${geo.runways.length - 1} more: ${geo.runways.slice(1).map(x => osmWay(x.id)).join(', ')})` : ''}. Width from ${r.wid_m ? 'AFAC' : (pr.width ? 'OpenStreetMap' : 'a 15 m default')} (${Math.round(pr.width)} m).`,
       !osm ? '<b>Ramp, taxiways:</b> not loaded (OpenStreetMap didn\'t answer).'
         : Ly.aprons.length || Ly.taxi.length || Ly.hangars.length
@@ -988,7 +1039,9 @@
     const line = (name, style, pts) => `<Placemark><name>${esc(name)}</name><styleUrl>#${style}</styleUrl><LineString><coordinates>${c(pts)}</coordinates></LineString></Placemark>`;
     const point = (name, pt, descr) => `<Placemark><name>${esc(name)}</name>${descr ? `<description><![CDATA[${descr}]]></description>` : ''}<styleUrl>#lbl</styleUrl><Point><coordinates>${c([pt])}</coordinates></Point></Placemark>`;
     const st = (id, lineHex, lineA, w, fillHex, fillA) => `<Style id="${id}"><LineStyle><color>${kmlColor(lineHex, lineA)}</color><width>${w}</width></LineStyle>${fillHex ? `<PolyStyle><color>${kmlColor(fillHex, fillA)}</color></PolyStyle>` : '<PolyStyle><fill>0</fill></PolyStyle>'}</Style>`;
-    const src = manualEnds ? 'runway ends entered by the user' : 'runway, ramp, taxiway and hangar shapes © OpenStreetMap contributors (ODbL)';
+    const src = manualEnds ? 'runway ends placed by the user on satellite imagery' + (osm && (osm.aprons.length || osm.taxi.length) ? '; ramp and taxiways © OpenStreetMap contributors (ODbL)' : '')
+      : pr.starter ? `runway estimated from AFAC's point, runway numbers and length with WMM-2025 magnetic variation (${pr.note}); not checked against imagery`
+      : 'runway, ramp, taxiway and hangar shapes © OpenStreetMap contributors (ODbL)';
     const len = Math.round(dist(pr.a, pr.b));
     const descr = [
       `<b>${esc(r.des || '')} ${esc(r.name)}</b>, ${esc([r.muni, r.state].filter(Boolean).join(', '))}`,

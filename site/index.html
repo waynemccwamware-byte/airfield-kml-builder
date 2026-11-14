@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -225,7 +225,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.12</span>
+    <span class="ver mono">v0.13</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -306,10 +306,11 @@
           <label><input type="checkbox" id="optBox" checked> Draw airfield box</label>
         </div>
         <div class="actions">
-          <button class="btn primary" id="btnShare" type="button">Send KML to ForeFlight…</button>
+          <button class="btn primary" id="btnOpenFF" type="button">Open in ForeFlight (iPhone/iPad)</button>
+          <button class="btn" id="btnShare" type="button">Share KML…</button>
           <button class="btn" id="btnDownload" type="button">Download .kml</button>
         </div>
-        <p class="hint" style="margin-top:8px">On iPhone or iPad, "Send KML to ForeFlight…" opens the share sheet: choose ForeFlight, and it imports the file as a User Map Layer. On a computer, download the file and AirDrop or email it to the iPad.</p>
+        <p class="hint" style="margin-top:8px">On iPhone or iPad, tap "Open in ForeFlight": the KML opens as a file from a web link. Tap the share button and choose ForeFlight (it may be under More), and ForeFlight imports it as a User Map Layer. "Share KML…" opens the share sheet directly, but iOS doesn't always list ForeFlight there. On a computer, download the file and AirDrop or email it to the iPad.</p>
         <div class="status" id="outStatus" role="status" aria-live="polite"></div>
       </div>
     </section>
@@ -1012,6 +1013,20 @@
   }
   const fileName = () => `${(rec.des || 'airfield')}_${rec.name}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '.kml';
 
+  // v0.13: the KML as a real link (netlify/functions/kml.js echoes it back as a .kml download), the way
+  // ForeFlight documents importing KML. Compressed so the link stays short.
+  async function openViaLink(){
+    const kml = buildKml(), name = fileName();
+    try {
+      const cs = new Blob([kml]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      const bytes = new Uint8Array(await new Response(cs).arrayBuffer());
+      let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      const d = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      if (d.length > 60000){ $('outStatus').className = 'status warn'; $('outStatus').textContent = 'This KML is too big for a link. Use Download .kml.'; return; }
+      window.location.href = `/.netlify/functions/kml?n=${encodeURIComponent(name.replace(/\.kml$/, ''))}&d=${d}`;
+    } catch (e){ download(kml, name); }
+  }
+
   async function share(){
     const kml = buildKml(), name = fileName();
     const file = new File([kml], name, { type: 'application/vnd.google-earth.kml+xml' });
@@ -1057,6 +1072,7 @@
   $('q').addEventListener('search', onQuery);
   $('q').addEventListener('keydown', e => { if (e.key === 'Enter'){ const li = $('results').querySelector('li'); if (li) li.click(); } });
   $('btnShare').addEventListener('click', share);
+  $('btnOpenFF').addEventListener('click', openViaLink);
   $('btnPick').addEventListener('click', startPicking);
   $('btnDownload').addEventListener('click', () => download());
   $('buf').addEventListener('input', () => { save(); if (geo) draw(); });

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.22 (14-Nov-2026): OurAirports identifiers (MX-0007) find the AFAC aerodrome (oa.js); designator cells with notes match on their code. v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -231,7 +231,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.21</span>
+    <span class="ver mono">v0.22</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight (or Garmin Pilot) as a map layer.</p>
 
@@ -242,7 +242,7 @@
       <div class="step-num">1</div>
       <div class="step-body">
         <h2>Find the airfield</h2>
-        <p class="hint">Search AFAC's list of aerodromes by designator (e.g. SBY or XSBY), name or municipality. It's the same official list that <a href="https://airports.robrc.net/" target="_blank" rel="noopener">airports.robrc.net</a> puts on a searchable map of Mexico. That site showed us the way to this data, and it's well worth a visit.</p>
+        <p class="hint">Search AFAC's list of aerodromes by designator (e.g. SBY or XSBY), OurAirports code (e.g. MX-0007), name or municipality. It's the same official list that <a href="https://airports.robrc.net/" target="_blank" rel="noopener">airports.robrc.net</a> puts on a searchable map of Mexico. That site showed us the way to this data, and it's well worth a visit.</p>
         <input class="fld wide" id="q" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="SBY or XSBY, Scorpion Bay, Comondú…" aria-label="Search AFAC aerodromes">
         <ul class="results" id="results" role="listbox" aria-label="Matching aerodromes"></ul>
         <div class="status" id="listStatus" role="status" aria-live="polite">Loading AFAC list…</div>
@@ -445,6 +445,41 @@
     }
   }
 
+  const desKey = r => (norm(r.des).match(/^[A-Z0-9]{3,4}\b/) || [norm(r.des)])[0];
+  // v0.22: OurAirports identifiers (MX-0007) -> AFAC record, via netlify/functions/oa.js
+  const OA_CACHE = {};
+  async function oaLookup(q){
+    const key = q.replace(/^MX-?/, '');
+    if (!(key in OA_CACHE)){
+      try { OA_CACHE[key] = await (await fetch('/.netlify/functions/oa?ident=MX-' + key)).json(); }
+      catch (e){ OA_CACHE[key] = { error: 'lookup failed' }; }
+    }
+    if (norm($('q').value.trim()) !== q) return;           // the user typed on
+    const d = OA_CACHE[key], ul = $('results');
+    const li = document.createElement('li');
+    if (!d || d.error || !d.found){
+      li.className = 'icao-note'; li.innerHTML = `<b>${esc(q)}</b>: ${d && d.error ? 'couldn\'t reach OurAirports just now.' : 'no such OurAirports identifier in Mexico.'}`;
+      ul.replaceChildren(li); return;
+    }
+    const o = d.row;
+    let match = o.local ? DATA.records.find(r => desKey(r) === o.local.toUpperCase()) : null, how = match ? `local code ${esc(o.local)} = AFAC designator` : '';
+    if (!match && isFinite(o.lat)){
+      let best = null, bd = 3000;
+      for (const r of DATA.records) if (r.lat != null){ const dd = dist([o.lat, o.lon], [r.lat, r.lon]); if (dd < bd){ bd = dd; best = r; } }
+      if (best){ match = best; how = `AFAC's nearest aerodrome, ${(bd / 1000).toFixed(1)} km away`; }
+    }
+    if (!match){
+      li.className = 'icao-note';
+      li.innerHTML = `<b>${esc(d.ident)}</b> is OurAirports' ${esc(o.name)}${o.muni ? ' (' + esc(o.muni) + ')' : ''}${o.type === 'closed' ? ', listed there as closed' : ''}. It isn't in AFAC's list, and no AFAC aerodrome is within 3 km of it.`;
+      ul.replaceChildren(li); return;
+    }
+    li.tabIndex = 0;
+    li.innerHTML = `<span class="des">${esc(match.des)}</span>${esc(match.name)}<span class="sub">OurAirports ${esc(d.ident)} = ${esc(o.name)} · ${how}</span>`;
+    li.addEventListener('click', () => pick(match));
+    li.addEventListener('keydown', e => { if (e.key === 'Enter') pick(match); });
+    ul.replaceChildren(li);
+  }
+
   function search(){
     const ul = $('results'); ul.innerHTML = '';
     if (!DATA) return;
@@ -452,9 +487,10 @@
     if (q.length < 2) return;
     // v0.19: "XFTE" = AFAC's "FTE" (the X-prefixed form ForeFlight and others use for Mexican strips)
     const qx = /^X[A-Z0-9]{3}$/.test(q) ? q.slice(1) : null;
+    if (/^MX-?\d{1,4}$/.test(q)){ const li = document.createElement('li'); li.textContent = 'Looking up ' + q + ' in OurAirports…'; li.style.cursor = 'default'; ul.appendChild(li); oaLookup(q); return; }
     const hits = [];
     for (const r of DATA.records){
-      const des = norm(r.des);
+      const des = desKey(r);
       let score = des === q || (qx && des === qx) ? 0 : des.startsWith(q) ? 1 : -1;
       if (score < 0){
         const hay = norm(`${r.name} ${r.muni} ${r.state}`);

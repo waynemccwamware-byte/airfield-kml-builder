@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -148,6 +148,7 @@
   .map .leaflet-control-layers{ background:var(--bg-panel); color:var(--text-primary); border:1px solid var(--bezel-hi); font:12.5px 'IBM Plex Sans', sans-serif; }
   .map .leaflet-control-attribution{ background:rgba(16,20,26,.8); color:var(--text-muted); font-size:10px; }
   .map .leaflet-control-attribution a{ color:var(--teal); }
+  .map .leaflet-bar a.fit-btn{ display:flex; align-items:center; justify-content:center; }
   .map .leaflet-bar a{ background:var(--bg-panel); color:var(--text-primary); border-bottom-color:var(--bezel-hi); }
   .map .leaflet-control-scale-line{ background:rgba(16,20,26,.75); color:var(--text-primary); border-color:var(--text-muted); }
   .rwy-lbl{ font:600 14px 'IBM Plex Mono', monospace; color:#f5a623; text-shadow:0 0 3px #000, 0 0 3px #000, 0 0 5px #000; white-space:nowrap; text-align:center; }
@@ -225,7 +226,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.16</span>
+    <span class="ver mono">v0.17</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -872,6 +873,17 @@
     (baseLayers[base] || baseLayers.Satellite).addTo(map);
     L.control.layers(baseLayers, null, { collapsed:false, position:'topright' }).addTo(map);
     L.control.scale({ imperial:true, metric:true }).addTo(map);
+    // v0.17: zoom-to-airfield button under + / − (fits the runway and box, or AFAC's point when there's no runway yet)
+    const Fit = L.Control.extend({ options:{ position:'topleft' }, onAdd(){
+      const bar = L.DomUtil.create('div', 'leaflet-bar');
+      const a = L.DomUtil.create('a', 'fit-btn', bar);
+      a.href = '#'; a.title = 'Zoom to the airfield'; a.setAttribute('role', 'button'); a.setAttribute('aria-label', 'Zoom to the airfield');
+      a.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><circle cx="12" cy="12" r="2"/></svg>';
+      L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); fitAirfield(); });
+      return bar;
+    } });
+    map.addControl(new Fit());
     map.on('baselayerchange', e => { try { localStorage.setItem(BASE_KEY, e.name); } catch(err){} });
     map.on('click', onMapClick);
     overlay = L.layerGroup().addTo(map);
@@ -904,6 +916,12 @@
     }
     $('legend').innerHTML = `<span><i style="background:${Ly.C.rwy}"></i>Runway (${Ly.C.label})</span><span><i style="background:${Ly.C.ramp}"></i>Ramp / taxiways</span>${Ly.box ? `<span><i style="background:${Ly.C.box};opacity:.6"></i>Airfield box (+${Ly.margin} m)</span>` : ''}<span><i style="background:transparent;border:2px solid #3fa7a0;border-radius:50%"></i>AFAC point</span>`;
     sources(Ly);
+  }
+
+  function fitAirfield(){
+    if (!map || !rec) return;
+    if (geo){ const Ly = layers(); map.fitBounds(L.latLngBounds([...(Ly.box || []), ...Ly.rwyPolys.flatMap(x => x.poly)]), { padding:[24, 24], maxZoom:17 }); }
+    else if (rec.lat != null) map.setView([rec.lat, rec.lon], 15);
   }
 
   // no runway yet: AFAC's point on the satellite view, KML buttons off, invite tapping the ends

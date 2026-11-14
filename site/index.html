@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<!-- Airfield KML Builder v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+     runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
+     Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Airfield KML Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Leaflet 1.9.4 (pinned, jsDelivr) for the preview map, App Conventions §7 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --bg-deep:#10141a;
+    --bg-panel:#1b222c;
+    --bezel:#2a323f;
+    --bezel-hi:#3a4454;
+    --amber:#f5a623;
+    --amber-dim:#7a5a1e;
+    --amber-glow:rgba(245,166,35,0.35);
+    --text-primary:#e7e4dc;
+    --text-muted:#8b93a1;
+    --teal:#3fa7a0;
+    --alert:#e0705f;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top, 0px);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  *,*::before,*::after{ box-sizing:inherit; }
+  html{ background:var(--bg-deep); overscroll-behavior:none; color-scheme:dark; }
+  body{
+    margin:0; min-height:100vh; overscroll-behavior:none;
+    background:radial-gradient(ellipse at 50% 0%, #171d26 0%, var(--bg-deep) 60%);
+    font-family:'IBM Plex Sans', sans-serif; color:var(--text-primary);
+    padding:14px 12px 40px;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  .rig{ width:100%; max-width:760px; margin:0 auto; }
+
+  .title-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:2px; padding:0 4px; }
+  .title-row h1{ font-size:19px; font-weight:600; margin:0; letter-spacing:0.01em; }
+  .title-row .ver{ font-size:11px; color:var(--text-muted); }
+  .purpose-line{ font-size:12.5px; color:var(--teal); margin:4px 4px 10px; line-height:1.5; }
+  .purpose-label{ color:var(--text-primary); }
+
+  .panel{ display:flex; flex-direction:column; gap:10px; }
+  .step{
+    display:grid; grid-template-columns:26px minmax(0,1fr); gap:10px;
+    padding:12px 14px; background:var(--bg-panel); border:1px solid var(--bezel-hi); border-radius:10px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .step[hidden]{ display:none; }
+  .step-num{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--amber);
+    border:1px solid var(--amber-dim); border-radius:50%;
+    width:24px; height:24px; display:flex; align-items:center; justify-content:center; margin-top:2px;
+  }
+  .step-body{ min-width:0; }
+  .step-body h2{ font-size:13.5px; font-weight:600; margin:0 0 2px; letter-spacing:0.02em; }
+  .hint{ font-size:12px; color:var(--text-muted); margin:0 0 8px; line-height:1.45; }
+
+  .fld{
+    background:var(--bg-deep); color:var(--text-primary); border:1px solid var(--bezel-hi); border-radius:6px;
+    font:500 16px 'IBM Plex Mono', monospace; padding:7px 10px; outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .fld::placeholder{ color:#566070; }
+  .fld:focus{ border-color:var(--amber); box-shadow:0 0 0 2px var(--amber-glow); }
+  .fld.wide{ width:100%; }
+  .fld.small{ width:96px; }
+  .fld.coord{ width:100%; max-width:300px; font-size:14px; }
+  .fld.bad{ border-color:var(--alert); }
+
+  a{ color:var(--teal); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+
+  .actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+  .btn{
+    font:500 13px 'IBM Plex Sans', sans-serif; padding:10px 16px; border-radius:6px;
+    border:1px solid var(--bezel-hi); background:transparent; color:var(--text-muted); cursor:pointer;
+    transition:color .15s ease, border-color .15s ease; text-decoration:none; display:inline-block;
+  }
+  .btn:hover{ color:var(--amber); border-color:var(--amber); text-decoration:none; }
+  .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+  .btn.primary{ color:var(--amber); border-color:var(--amber-dim); background:rgba(245,166,35,0.08); }
+  .btn[disabled]{ opacity:.45; pointer-events:none; }
+  .fine{ margin:10px 4px 0; font-size:11px; line-height:1.6; color:var(--text-muted); }
+
+  /* results list */
+  .results{ list-style:none; margin:8px 0 0; padding:0; max-height:330px; overflow:auto; border:1px solid var(--bezel); border-radius:8px; }
+  .results:empty{ display:none; }
+  .results li{ padding:8px 10px; border-bottom:1px solid var(--bezel); cursor:pointer; font-size:13px; line-height:1.4; }
+  .results li:last-child{ border-bottom:0; }
+  .results li:hover, .results li:focus{ background:rgba(245,166,35,0.07); outline:none; }
+  .results .des{ font:600 14px 'IBM Plex Mono', monospace; color:var(--amber); margin-right:8px; }
+  .results .sub{ display:block; color:var(--text-muted); font-size:11.5px; }
+  .status{ margin-top:8px; font-size:12.5px; min-height:18px; color:var(--text-muted); }
+  .status.ok{ color:var(--teal); }
+  .status.warn{ color:var(--alert); }
+
+  /* key/value tables */
+  .kv{ width:100%; border-collapse:collapse; font-size:13px; }
+  .kv th{ text-align:left; font-weight:500; color:var(--text-muted); padding:4px 10px 4px 0; vertical-align:top; width:38%; }
+  .kv td{ padding:4px 0; border-top:1px solid var(--bezel); }
+  .kv tr:first-child td{ border-top:0; }
+  .kv td.num{ font-family:'IBM Plex Mono', monospace; }
+  .tag{ display:inline-block; font:500 11px 'IBM Plex Mono', monospace; padding:1px 7px; border-radius:10px; border:1px solid var(--bezel-hi); color:var(--text-muted); margin-left:6px; }
+  .tag.ok{ color:var(--teal); border-color:var(--teal); }
+  .tag.warn{ color:var(--alert); border-color:var(--alert); }
+  .tag.src{ color:var(--amber); border-color:var(--amber-dim); }
+  .checks{ list-style:none; margin:8px 0 0; padding:0; font-size:12.5px; line-height:1.5; }
+  .checks li{ padding:4px 0 4px 18px; position:relative; }
+  .checks li::before{ content:'●'; position:absolute; left:0; top:4px; font-size:10px; color:var(--text-muted); }
+  .checks li.ok::before{ color:var(--teal); }
+  .checks li.warn::before{ color:var(--alert); }
+  .checks li.info::before{ color:var(--amber); }
+
+  .opts{ display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin:6px 0; font-size:13px; }
+  .opts label{ display:flex; align-items:center; gap:8px; }
+  details.manual{ margin-top:10px; border-top:1px solid var(--bezel); padding-top:8px; }
+  details.manual summary{ cursor:pointer; font-size:12.5px; color:var(--amber); }
+  .grid2{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 10px; align-items:center; margin-top:8px; font-size:12.5px; }
+
+  .map{ width:100%; height:440px; background:#0c1015; border:1px solid var(--bezel); border-radius:8px; }
+  .map .leaflet-control-layers{ background:var(--bg-panel); color:var(--text-primary); border:1px solid var(--bezel-hi); font:12.5px 'IBM Plex Sans', sans-serif; }
+  .map .leaflet-control-attribution{ background:rgba(16,20,26,.8); color:var(--text-muted); font-size:10px; }
+  .map .leaflet-control-attribution a{ color:var(--teal); }
+  .map .leaflet-bar a{ background:var(--bg-panel); color:var(--text-primary); border-bottom-color:var(--bezel-hi); }
+  .map .leaflet-control-scale-line{ background:rgba(16,20,26,.75); color:var(--text-primary); border-color:var(--text-muted); }
+  .rwy-lbl{ font:600 14px 'IBM Plex Mono', monospace; color:#f5a623; text-shadow:0 0 3px #000, 0 0 3px #000, 0 0 5px #000; white-space:nowrap; text-align:center; }
+  .srcs{ list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.5; color:var(--text-muted); }
+  .srcs li{ padding:3px 0; border-top:1px solid var(--bezel); }
+  .srcs li:first-child{ border-top:0; }
+  .srcs b{ color:var(--text-primary); font-weight:500; }
+  @media (max-width:480px){ .map{ height:62vh; } }
+  .legend{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11.5px; color:var(--text-muted); margin-top:6px; }
+  .legend i{ display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:5px; vertical-align:-2px; border:1px solid #fff3; }
+  .credits{ font-size:11.5px; color:var(--text-muted); line-height:1.6; margin:0; padding-left:18px; }
+  .credits li{ margin:2px 0; }
+
+  @media (max-width:480px){
+    body{ padding:10px 8px 32px; }
+    .step{ grid-template-columns:22px minmax(0,1fr); gap:8px; padding:10px 10px; }
+    .step-num{ width:20px; height:20px; font-size:11px; }
+    .kv th{ width:44%; }
+  }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; } }
+</style>
+<!-- GGP-FOOTER-CSS START v1.14 · 13-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<style>
+.ggp-footer{
+  --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
+  box-sizing:border-box; width:100%; max-width:640px; margin:28px auto 0; padding:16px 0 8px;
+  border-top:1px solid var(--ggp-bezel); text-align:center;
+  font-family:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size:11px; line-height:1.5; color:var(--ggp-muted);
+}
+.ggp-footer *, .ggp-footer *::before, .ggp-footer *::after{ box-sizing:border-box; }
+.ggp-footer .ggp-back{ margin:0 0 12px; }
+.ggp-footer .ggp-back a{
+  display:inline-block; padding:6px 14px; border:1px solid var(--ggp-bezel-hi); border-radius:5px;
+  background:var(--ggp-bezel); color:var(--ggp-amber); font-size:12px; font-weight:500; text-decoration:none;
+}
+.ggp-footer .ggp-back a:hover{ background:var(--ggp-bezel-hi); color:var(--ggp-amber); text-decoration:none; }
+.ggp-footer .ggp-extra{ margin:0 0 6px; text-wrap:balance; }
+.ggp-footer .ggp-credit{ margin:0; }
+.ggp-footer .ggp-extra a, .ggp-footer .ggp-credit a{
+  color:var(--ggp-muted); text-decoration:none; border-bottom:1px solid var(--ggp-bezel-hi); padding-bottom:1px;
+}
+.ggp-footer .ggp-extra a:hover, .ggp-footer .ggp-credit a:hover{ color:var(--ggp-amber); border-bottom-color:var(--ggp-amber); }
+.ggp-footer .ggp-count{ margin-top:6px; }
+.ggp-footer .ggp-count:empty{ display:none; }
+.ggp-footer .ggp-count a{ color:inherit; text-decoration:none; border-bottom:1px dotted var(--ggp-bezel-hi); padding-bottom:1px; }
+.ggp-footer .ggp-count a:hover{ color:var(--ggp-amber); border-bottom-color:var(--ggp-amber); }
+.ggp-footer .ggp-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:12px; }
+.ggp-footer .ggp-pill{
+  display:inline-flex; align-items:center; gap:7px; margin:0; padding:8px 16px;
+  border:1px solid var(--ggp-bezel-hi); border-radius:20px; background:transparent; color:var(--ggp-muted);
+  font:inherit; font-size:12.5px; line-height:1.2; cursor:pointer; transition:color .15s ease, border-color .15s ease;
+}
+.ggp-footer a.ggp-pill{ text-decoration:none; }
+/* v1.6: shown under a feedback button when no email app opened */
+.ggp-fb-note{ flex-basis:100%; margin:10px auto 0; max-width:460px; padding:10px 12px; border:1px solid #3a4454; border-radius:6px;
+  font:12px/1.5 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color:#8b93a1; text-align:center; }
+.ggp-fb-note b{ color:#e7e4dc; font-weight:500; user-select:all; }
+.ggp-fb-note button{ margin-left:8px; padding:3px 10px; border:1px solid #3a4454; border-radius:12px; background:transparent;
+  color:#f5a623; font:inherit; cursor:pointer; }
+.ggp-footer .ggp-pill:hover{ color:var(--ggp-amber); border-color:var(--ggp-amber); background:transparent; }
+.ggp-footer .ggp-pill svg{ width:15px; height:15px; flex-shrink:0; }
+.ggp-footer .ggp-pill span{ text-wrap:balance; }
+@media (max-width:400px){ .ggp-footer .ggp-pill{ font-size:12px; padding:8px 12px; gap:6px; } }
+.ggp-footer a:focus-visible, .ggp-footer .ggp-pill:focus-visible{ outline:2px solid var(--ggp-amber); outline-offset:2px; }
+@media print{
+  .ggp-footer .ggp-back, .ggp-footer .ggp-extra, .ggp-footer .ggp-count, .ggp-footer .ggp-actions{ display:none !important; }
+  .ggp-footer{ border-top:0; margin-top:8px; padding-top:0; }
+}
+</style>
+<!-- GGP-FOOTER-CSS END -->
+</head>
+<body>
+<div class="rig">
+
+  <div class="title-row">
+    <h1>Airfield KML Builder</h1>
+    <span class="ver mono">v0.1</span>
+  </div>
+  <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check whether ForeFlight already shows it, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
+
+  <div class="panel">
+
+    <!-- 1. Find -->
+    <section class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h2>Find the airfield</h2>
+        <p class="hint">Search AFAC's list of aerodromes by designator (e.g. SBY), name or municipality.</p>
+        <input class="fld wide" id="q" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="SBY, Scorpion Bay, Comondú…" aria-label="Search AFAC aerodromes">
+        <ul class="results" id="results" role="listbox" aria-label="Matching aerodromes"></ul>
+        <div class="status" id="listStatus" role="status" aria-live="polite">Loading AFAC list…</div>
+      </div>
+    </section>
+
+    <!-- 2. AFAC record -->
+    <section class="step" id="stepRec" hidden>
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h2 id="recTitle">AFAC record</h2>
+        <p class="hint" id="recSource"></p>
+        <table class="kv" id="recTable"></table>
+        <div class="actions">
+          <a class="btn" id="lnkRobrc" target="_blank" rel="noopener">See it on airports.robrc.net</a>
+          <a class="btn" id="lnkSat" target="_blank" rel="noopener">Satellite view (Google Maps)</a>
+          <a class="btn" id="lnkOsm" target="_blank" rel="noopener">OpenStreetMap</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ForeFlight check -->
+    <section class="step" id="stepFF" hidden>
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h2>Is it already in ForeFlight?</h2>
+        <p class="hint">This page can't reach ForeFlight itself. The button opens Claude with the question typed in, for Claude to answer with your ForeFlight connector. Watch for look-alike codes: ForeFlight's "SBY" is Salisbury, Maryland (KSBY), while Scorpion Bay is XSBY. A match counts only if it's in Mexico and close to AFAC's position. ForeFlight sometimes has an airfield's position but no runway data, and the KML is still worth having then.</p>
+        <div class="actions"><a class="btn primary" id="lnkClaude" target="_blank" rel="noopener">Ask Claude to check ForeFlight</a></div>
+      </div>
+    </section>
+
+    <!-- 4. Geometry -->
+    <section class="step" id="stepGeo" hidden>
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h2>Runway, ramp and taxiways</h2>
+        <p class="hint">Shapes come from OpenStreetMap, checked against AFAC's figures. AFAC gives only one reference point, the runway numbers, length, width and surface, so without OpenStreetMap the runway's position and direction would be guesses.</p>
+        <div class="status" id="geoStatus" role="status" aria-live="polite"></div>
+        <ul class="checks" id="checks"></ul>
+        <details class="manual" id="manual">
+          <summary>Enter the runway ends yourself</summary>
+          <p class="hint" style="margin-top:6px">Use this when OpenStreetMap has no runway, or its runway looks wrong on the satellite view. In Google Maps or Google Earth, long-press each end of the runway and copy the coordinates (decimal degrees, e.g. 26.25824, -112.50316). Coordinates entered here replace OpenStreetMap's runway.</p>
+          <div class="grid2">
+            <label for="endA">End A</label><input class="fld coord" id="endA" placeholder="lat, lon" inputmode="text" autocomplete="off">
+            <label for="endB">End B</label><input class="fld coord" id="endB" placeholder="lat, lon" inputmode="text" autocomplete="off">
+          </div>
+          <div class="actions"><button class="btn" id="btnManual" type="button">Use these ends</button><button class="btn" id="btnManualClear" type="button">Back to OpenStreetMap</button></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- 5. Preview & export -->
+    <section class="step" id="stepOut" hidden>
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h2>Preview and send to ForeFlight</h2>
+        <p class="hint">This is what the KML will draw. Zoom and pan, and switch between Satellite, Map and Topo (top right) to check the shapes against the ground before sending. Colors follow the runway surface: asphalt black, concrete gray, dirt brown, gravel tan, grass green. The ramp and taxiways are a shade lighter, and the airfield box lighter still.</p>
+        <div class="map" id="map" role="region" aria-label="Preview map of the airfield KML"></div>
+        <div class="legend" id="legend"></div>
+        <h2 style="margin-top:12px">Where each piece comes from</h2>
+        <ul class="srcs" id="srcList"></ul>
+        <div class="opts">
+          <label>Airfield box margin <input class="fld small" id="buf" inputmode="numeric" value="20" aria-label="Airfield box margin in meters"> m</label>
+          <label><input type="checkbox" id="optBox" checked> Draw airfield box</label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnShare" type="button">Send KML to ForeFlight…</button>
+          <button class="btn" id="btnDownload" type="button">Download .kml</button>
+        </div>
+        <p class="hint" style="margin-top:8px">On iPhone or iPad, "Send KML to ForeFlight…" opens the share sheet: choose ForeFlight, and it imports the file as a User Map Layer. On a computer, download the file and AirDrop or email it to the iPad.</p>
+        <div class="status" id="outStatus" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- Credits -->
+    <section class="step">
+      <div class="step-num">i</div>
+      <div class="step-body">
+        <h2>Data and thanks</h2>
+        <ul class="credits">
+          <li><b>AFAC</b> (Agencia Federal de Aviación Civil), "Aeródromos y helipuertos" list on gob.mx: <span id="afacEdition">edition loading…</span></li>
+          <li><b>OpenStreetMap</b>: runway, ramp, taxiway and hangar shapes, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL. Read through the <a href="https://wiki.openstreetmap.org/wiki/Overpass_API" target="_blank" rel="noopener">Overpass API</a>. If a strip is missing there, adding it to OpenStreetMap helps every pilot who uses this app.</li>
+          <li>With thanks to <a href="https://airports.robrc.net/" target="_blank" rel="noopener"><b>airports.robrc.net</b></a>, the public directory of Mexican airport infrastructure that showed the way to AFAC's data. Its map and its corrections to AFAC's figures are worth a look.</li>
+        </ul>
+      </div>
+    </section>
+
+  </div>
+
+  <p class="fine">Not for navigation. A planning and situational-awareness aid only. Positions come from published figures and volunteer mapping and can be wrong. Check every airfield against current official sources, recent pilot reports and your own eyes before using it.</p>
+
+  <!-- GGP-FOOTER START v1.14 · 13-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+<footer class="ggp-footer">
+  <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
+  <div class="ggp-credit">Wayne McClelland (<a href="https://geezer-geek-pilot-control-panel.netlify.app/airports/" target="_blank" rel="noopener">airports visited</a>), <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://geezer-geek-pilot-control-panel.netlify.app/reference" target="_blank" rel="noopener">Reference Materials</a></div>
+  <div class="ggp-actions">
+    <button class="ggp-pill ggp-share" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg><span>Share GeezerGeek Pilot Apps with pilot friends</span></button>
+    <button class="ggp-pill ggp-feedback" type="button" data-app="Airfield KML Builder"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Feedback to GeezerGeek Pilot</span></button>
+    <a class="ggp-pill ggp-videos" href="https://www.youtube.com/playlist?list=PLZEU99ONr5bE" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><polygon points="10 9 15 12 10 15" fill="currentColor"/></svg><span>YouTube intros to the apps</span></a>
+  </div>
+</footer>
+<!-- GGP-FOOTER END -->
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const KEY = 'airfieldKml.v1';
+  const R = 6371008.8;
+  const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmtDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? `${m[3]}-${MONTHS[+m[2]-1]}-${m[1]}` : (iso || '—'); };
+  const ft = m => Math.round(m / 0.3048);
+
+  // ---------- geodesy ----------
+  function dist(a, b){
+    const [la1, lo1, la2, lo2] = [a[0], a[1], b[0], b[1]].map(rad);
+    const h = Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  function brg(a, b){
+    const [la1, lo1, la2, lo2] = [a[0], a[1], b[0], b[1]].map(rad);
+    const y = Math.sin(lo2-lo1)*Math.cos(la2), x = Math.cos(la1)*Math.sin(la2) - Math.sin(la1)*Math.cos(la2)*Math.cos(lo2-lo1);
+    return (deg(Math.atan2(y, x)) + 360) % 360;
+  }
+  function dest(p, b, d){
+    const la = rad(p[0]), lo = rad(p[1]), br = rad(b), dr = d / R;
+    const la2 = Math.asin(Math.sin(la)*Math.cos(dr) + Math.cos(la)*Math.sin(dr)*Math.cos(br));
+    const lo2 = lo + Math.atan2(Math.sin(br)*Math.sin(dr)*Math.cos(la), Math.cos(dr) - Math.sin(la)*Math.sin(la2));
+    return [deg(la2), deg(lo2)];
+  }
+  // local flat frame (meters east/north of an origin): plenty accurate over an airfield
+  const enu = o => ({
+    to: p => [rad(p[1]-o[1]) * R * Math.cos(rad(o[0])), rad(p[0]-o[0]) * R],
+    from: q => [o[0] + deg(q[1]/R), o[1] + deg(q[0]/(R*Math.cos(rad(o[0]))))],
+  });
+  // signed cross-track and along-track of p from the line a->b, meters
+  function track(a, b, p){
+    const f = enu(a), B = f.to(b), P = f.to(p), L = Math.hypot(B[0], B[1]) || 1;
+    const ux = B[0]/L, uy = B[1]/L;
+    return { along: P[0]*ux + P[1]*uy, cross: P[0]*uy - P[1]*ux, len: L };
+  }
+  const angDiff = (a, b) => { let d = ((a - b) % 360 + 540) % 360 - 180; return d; };
+
+  // ---------- surface -> colors ----------
+  const SURF = {
+    asphalt:  { label:'asphalt',  rwy:'#1e1e1e', ramp:'#3e3e3e', box:'#8c8c8c' },
+    concrete: { label:'concrete', rwy:'#8f8f8f', ramp:'#b0b0b0', box:'#d8d8d8' },
+    dirt:     { label:'dirt',     rwy:'#6e4321', ramp:'#8e5f39', box:'#caa47f' },
+    gravel:   { label:'gravel',   rwy:'#73695a', ramp:'#958c7c', box:'#ccc5b7' },
+    grass:    { label:'grass',    rwy:'#3d6b2c', ramp:'#5f8b4b', box:'#aac89b' },
+    water:    { label:'water',    rwy:'#1f5f99', ramp:'#4a86c0', box:'#a6c9e8' },
+    unknown:  { label:'unknown',  rwy:'#4a4a56', ramp:'#6b6b77', box:'#b1b1ba' },
+  };
+  // first material named wins ("MIXTA ASFALTO Y TERRACERIA" -> asphalt)
+  const SURF_WORDS = [
+    ['asphalt', /ASFALT|PAVIMENTO|ASPHALT|PAVED|\bASP/], ['concrete', /CONCRET|CEMENTO|CONCRETE/],
+    ['gravel', /GRAVA|GRAVEL|PIEDRA|CALICHE|REVESTIMIENTO/],
+    ['dirt', /TERRAC|TERRAERIA|TIERRA|TERRENO|SUELO|ARCILLA|TEPETATE|TUCURUGUAY|DIRT|EARTH|GROUND|COMPACTED|SAND|UNPAVED/],
+    ['grass', /PASTO|GRASS/], ['water', /AGUA|ACUATIC|WATER/],
+  ];
+  function surfCat(s){
+    const t = norm(s); if (!t) return null;
+    let best = null, at = 1e9;
+    for (const [k, rx] of SURF_WORDS){ const m = rx.exec(t); if (m && m.index < at){ at = m.index; best = k; } }
+    return best;
+  }
+  const kmlColor = (hex, alpha) => (alpha + hex.slice(5,7) + hex.slice(3,5) + hex.slice(1,3)).toLowerCase();
+
+  // ---------- state ----------
+  let DATA = null, rec = null, osm = null, manualEnds = null, geo = null;
+
+  // ---------- 1. AFAC list ----------
+  async function loadList(){
+    try {
+      const r = await fetch('/.netlify/functions/afac');
+      const d = await r.json();
+      if (!r.ok || !d.records) throw new Error(d.error || ('HTTP ' + r.status));
+      DATA = d;
+      const ed = d.source.edition ? d.source.edition + ' edition' : 'current edition';
+      $('afacEdition').innerHTML = `<a href="${esc(d.source.url)}" target="_blank" rel="noopener">${esc(ed)}</a> (${d.source.count.toLocaleString()} aerodromes with a runway or water area; heliports left out).`;
+      $('listStatus').textContent = `${d.source.count.toLocaleString()} aerodromes from AFAC's list, ${ed}.`;
+      const saved = load();
+      if (saved.des){ const hit = DATA.records.find(x => x.des === saved.des && x.name === saved.name); if (hit){ $('q').value = hit.des; pick(hit); return; } }
+      search();
+    } catch (e){
+      $('listStatus').className = 'status warn';
+      $('listStatus').textContent = 'Could not load AFAC\'s list: ' + e.message + '. Try again in a minute.';
+    }
+  }
+
+  function search(){
+    const ul = $('results'); ul.innerHTML = '';
+    if (!DATA) return;
+    const q = norm($('q').value.trim());
+    if (q.length < 2) return;
+    const hits = [];
+    for (const r of DATA.records){
+      const des = norm(r.des);
+      let score = des === q ? 0 : des.startsWith(q) ? 1 : -1;
+      if (score < 0){
+        const hay = norm(`${r.name} ${r.muni} ${r.state}`);
+        if (hay.includes(q)) score = norm(r.name).startsWith(q) ? 2 : 3; else continue;
+      }
+      hits.push([score, r]);
+    }
+    hits.sort((a, b) => a[0] - b[0] || a[1].des.localeCompare(b[1].des));
+    for (const [, r] of hits.slice(0, 40)){
+      const li = document.createElement('li');
+      li.tabIndex = 0; li.setAttribute('role', 'option');
+      const rw = r.rwy.length ? `RWY ${r.rwy.map(pad2).join('/')}` : '';
+      const dims = r.len_m ? `${r.len_m.toLocaleString()} × ${r.wid_m ?? '?'} m` : '';
+      li.innerHTML = `<span class="des">${esc(r.des || '—')}</span>${esc(r.name)}`
+        + `<span class="sub">${esc([r.muni, r.state].filter(Boolean).join(', '))} · ${esc([rw, dims, r.surf].filter(Boolean).join(' · '))}${r.status && r.status !== 'VIGENTE' ? ' · ' + esc(r.status) : ''}</span>`;
+      li.addEventListener('click', () => pick(r));
+      li.addEventListener('keydown', e => { if (e.key === 'Enter') pick(r); });
+      ul.appendChild(li);
+    }
+    if (!hits.length){ const li = document.createElement('li'); li.textContent = 'No match in AFAC\'s list.'; li.style.cursor = 'default'; ul.appendChild(li); }
+  }
+  const pad2 = s => /^\d$/.test(String(s).trim()) ? '0' + String(s).trim() : String(s).trim();
+
+  // ---------- 2. record ----------
+  function pick(r){
+    rec = r; osm = null; manualEnds = null; geo = null;
+    $('results').innerHTML = '';
+    $('endA').value = ''; $('endB').value = '';
+    save();
+    $('recTitle').textContent = `${r.des || '—'} · ${r.name}`;
+    $('recSource').textContent = `AFAC list, ${DATA.source.edition || 'current'} edition, permit ${r.file || '—'}.`;
+    const pos = r.lat != null ? `${r.lat.toFixed(5)}, ${r.lon.toFixed(5)} (${esc(r.datum || 'datum not given')})` : 'not given';
+    const rows = [
+      ['Location', esc([r.muni, r.state].filter(Boolean).join(', '))],
+      ['Type', esc([r.type, r.cls, r.ref ? 'code ' + r.ref : ''].filter(Boolean).join(' · '))],
+      ['Reference point', `<span class="mono">${pos}</span>`],
+      ['Elevation', r.elev_m != null ? `<span class="mono">${r.elev_m} m (${ft(r.elev_m).toLocaleString()} ft)</span>` : '—'],
+      ['Runway', r.rwy.length ? `<span class="mono">${r.rwy.map(pad2).join('/')}</span>` : '—'],
+      ['Length × width', r.len_m ? `<span class="mono">${r.len_m.toLocaleString()} × ${r.wid_m ?? '?'} m (${ft(r.len_m).toLocaleString()} × ${r.wid_m ? ft(r.wid_m) : '?'} ft)</span>` : '—'],
+      ['Surface', esc(r.surf || '—')],
+      ['Operations', esc([r.ops, r.svc].filter(Boolean).join(' · '))],
+      ['Permit holder', esc(r.owner || '—')],
+      ['Permit', `${esc(r.status || r.current || '—')}${r.issued ? ' · issued ' + fmtDate(r.issued) : ''}${r.expires ? ' · expires ' + fmtDate(r.expires) : ''}`],
+      ['Coordinating airport', esc(r.coord_apt || '—')],
+    ];
+    $('recTable').innerHTML = rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+    const has = r.lat != null;
+    $('lnkRobrc').href = 'https://airports.robrc.net/?q=' + encodeURIComponent(r.des || r.name) + '&vigente=&view=map';
+    $('lnkSat').href = has ? `https://www.google.com/maps/@?api=1&map_action=map&center=${r.lat},${r.lon}&zoom=16&basemap=satellite` : '#';
+    $('lnkOsm').href = has ? `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}#map=16/${r.lat}/${r.lon}` : '#';
+    $('stepRec').hidden = false;
+
+    // 3. ForeFlight via Claude
+    const ids = [r.des, r.des ? 'X' + r.des : ''].filter(Boolean).join(', ');
+    const prompt = `Using my ForeFlight connector, check whether ForeFlight already has the Mexican airfield "${r.name}" (${[r.muni, r.state].filter(Boolean).join(', ')}), AFAC designator ${r.des || 'none'}`
+      + (has ? `, AFAC reference point ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}` : '') + `. Try identifiers ${ids} and any other you know for it. `
+      + `Count a match only if it is in Mexico and within about 2 nm of that point (a 3-letter code can also be a US airport, e.g. SBY = KSBY in Maryland). `
+      + `Tell me the identifier ForeFlight uses, and whether ForeFlight has runway data for it (runway, length, width, surface) or only a position.`;
+    $('lnkClaude').href = 'https://claude.ai/new?q=' + encodeURIComponent(prompt);
+    $('stepFF').hidden = false;
+
+    $('stepGeo').hidden = false; $('stepOut').hidden = true;
+    $('checks').innerHTML = '';
+    if (!has){ geoMsg('warn', 'AFAC gives no position for this airfield, so there is nothing to look up. Enter the runway ends yourself below.'); $('manual').open = true; return; }
+    fetchOsm();
+  }
+  const geoMsg = (cls, t) => { $('geoStatus').className = 'status ' + (cls || ''); $('geoStatus').textContent = t; };
+
+  // ---------- 4. OpenStreetMap ----------
+  async function fetchOsm(){
+    const r = rec;
+    geoMsg('', 'Looking up OpenStreetMap near AFAC\'s reference point…');
+    const q = `[out:json][timeout:25];nwr(around:2500,${r.lat},${r.lon})[aeroway~"^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$"];out geom;`;
+    let data = null, lastErr = '';
+    for (let i = 0; i < 3 && !data; i++){
+      try {
+        const res = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:'data=' + encodeURIComponent(q) });
+        if (res.ok) data = await res.json(); else lastErr = 'HTTP ' + res.status;
+      } catch (e){ lastErr = e.message; }
+      if (!data && i < 2) await new Promise(s => setTimeout(s, 2500 * (i + 1)));
+    }
+    if (rec !== r) return;     // user picked another airfield meanwhile
+    if (!data){ geoMsg('warn', `OpenStreetMap didn't answer (${lastErr}). Try again shortly, or enter the runway ends yourself.`); osm = { runways:[], aprons:[], taxi:[], hangars:[], aerodrome:null, failed:true }; build(); return; }
+    osm = parseOsm(data.elements || []);
+    build();
+  }
+
+  function parseOsm(els){
+    const out = { runways:[], aprons:[], taxi:[], hangars:[], aerodrome:null };
+    const pts = e => (e.geometry || []).filter(Boolean).map(g => [g.lat, g.lon]);
+    for (const e of els){
+      const t = e.tags || {};
+      if (e.type === 'relation'){
+        if (t.aeroway === 'aerodrome' && !out.aerodrome) out.aerodrome = { id:e.id, type:'relation', name:t.name || '' };
+        if (t.aeroway === 'apron'){   // multipolygon apron: use its outer rings
+          for (const m of e.members || []) if (m.role !== 'inner' && m.geometry) out.aprons.push({ id:e.id, pts:m.geometry.map(g => [g.lat, g.lon]), surface:t.surface || '' });
+        }
+        continue;
+      }
+      if (t.aeroway === 'aerodrome'){ out.aerodrome = out.aerodrome || { id:e.id, type:e.type, name:t.name || '' }; continue; }
+      const p = pts(e);
+      if (t.aeroway === 'runway' && p.length >= 2) out.runways.push(runwayFromWay(e, p));
+      else if (t.aeroway === 'apron' && p.length >= 3) out.aprons.push({ id:e.id, pts:p, surface:t.surface || '' });
+      else if ((t.aeroway === 'taxiway' || t.aeroway === 'taxilane') && p.length >= 2) out.taxi.push({ id:e.id, pts:p, ref:t.ref || '', closed: p.length > 3 && dist(p[0], p[p.length-1]) < 1 });
+      else if (t.aeroway === 'hangar' && p.length >= 3) out.hangars.push({ id:e.id, pts:p });
+    }
+    return out;
+  }
+
+  // A runway way is either a centerline or an outline (area). Either way: ends = the two extreme points along
+  // its long axis, width from the OSM width tag or the outline's spread across that axis.
+  function runwayFromWay(e, p){
+    const t = e.tags || {};
+    const closed = p.length > 3 && dist(p[0], p[p.length-1]) < 1;
+    let a = p[0], b = p[p.length-1], width = parseFloat(t.width) || null;
+    if (closed || p.length > 2){
+      let best = 0;
+      for (let i = 0; i < p.length; i++) for (let j = i+1; j < p.length; j++){ const d = dist(p[i], p[j]); if (d > best){ best = d; a = p[i]; b = p[j]; } }
+      if (closed){
+        // outline: center the ends across the width
+        const crosses = p.map(q => track(a, b, q).cross), lo = Math.min(...crosses), hi = Math.max(...crosses);
+        const mid = (lo + hi) / 2, f = enu(a), A = f.to(a), B = f.to(b), L = Math.hypot(B[0]-A[0], B[1]-A[1]);
+        const nx = (B[1]-A[1])/L, ny = -(B[0]-A[0])/L;   // unit normal matching track().cross sign
+        a = f.from([A[0] + nx*mid, A[1] + ny*mid]); b = f.from([B[0] + nx*mid, B[1] + ny*mid]);
+        if (!width) width = hi - lo;
+      }
+    }
+    return { id:e.id, a, b, ref:t.ref || '', surface:t.surface || '', width, closed };
+  }
+
+  // ---------- assemble geometry + checks ----------
+  function build(){
+    const r = rec, checks = [];
+    const add = (cls, html) => checks.push(`<li class="${cls}">${html}</li>`);
+    const P = r.lat != null ? [r.lat, r.lon] : null;
+    let runways = [];
+
+    if (manualEnds){
+      runways = [{ a:manualEnds[0], b:manualEnds[1], ref:'', surface:'', width:null, manual:true }];
+      add('info', 'Runway from the ends you entered.');
+    } else if (osm && osm.runways.length){
+      runways = osm.runways.slice();
+      if (P) runways.sort((x, y) => Math.abs(track(x.a, x.b, P).cross) - Math.abs(track(y.a, y.b, P).cross));
+      add('ok', `OpenStreetMap has ${runways.length === 1 ? 'a runway' : runways.length + ' runways'} here` + (osm.aerodrome?.name ? ` ("${esc(osm.aerodrome.name)}")` : '') + '.');
+    } else if (osm){
+      add('warn', 'OpenStreetMap has no runway within 2.5 km of AFAC\'s point. Enter the runway ends yourself (below), or add the strip to OpenStreetMap: <a target="_blank" rel="noopener" href="https://www.openstreetmap.org/edit#map=17/' + r.lat + '/' + r.lon + '">edit here</a>.');
+    }
+
+    // primary runway: label ends with AFAC designators (or OSM ref), compare figures
+    const prim = runways[0];
+    if (prim){
+      const len = dist(prim.a, prim.b), tb = brg(prim.a, prim.b);
+      const des = (r.rwy.length === 2 ? r.rwy : (prim.ref || '').split('/')).map(s => parseInt(s, 10)).filter(n => n >= 1 && n <= 36);
+      // the end you land FROM toward the other end gets the number nearest that direction (works whatever the variation)
+      if (des.length === 2){
+        const fit = n => Math.abs(angDiff(n * 10, tb));
+        const [x, y] = fit(des[0]) <= fit(des[1]) ? [des[0], des[1]] : [des[1], des[0]];
+        prim.labA = pad2(x); prim.labB = pad2(y);
+        const implied = angDiff(tb, x * 10);   // true − magnetic
+        add(Math.abs(implied) <= 25 ? 'info' : 'warn',
+          `Runway ${pad2(x)} points <span class="mono">${tb.toFixed(1)}°</span> true. Its number suggests magnetic variation of about <span class="mono">${Math.abs(implied).toFixed(0)}°${implied >= 0 ? 'E' : 'W'}</span> (±5°, since runway numbers are rounded). Compare it with the variation on your chart. A big difference means the shape or the runway numbers are off.`);
+      } else if (prim.ref){ const pr = prim.ref.split('/'); prim.labA = pr[0]; prim.labB = pr[1]; }
+      if (r.len_m){
+        const d = len - r.len_m, pct = d / r.len_m * 100;
+        add(Math.abs(pct) <= 5 ? 'ok' : 'warn', `Length: map <span class="mono">${Math.round(len).toLocaleString()} m</span> vs AFAC <span class="mono">${r.len_m.toLocaleString()} m</span> (${d >= 0 ? '+' : ''}${Math.round(d)} m, ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%).`);
+      } else add('info', `Length: map <span class="mono">${Math.round(len).toLocaleString()} m</span>. AFAC gives no length.`);
+      if (P){
+        const tk = track(prim.a, prim.b, P);
+        const onIt = Math.abs(tk.cross) <= Math.max(30, (r.wid_m || 20)) && tk.along >= -50 && tk.along <= tk.len + 50;
+        add(onIt ? 'ok' : 'warn', `AFAC's reference point is <span class="mono">${Math.abs(tk.cross).toFixed(0)} m</span> from the runway centerline${onIt ? ', so the two sources agree on where the runway is' : '. Check the satellite view: one of the two sources may be off'}.`);
+      }
+      const rs = surfCat(r.surf), os = surfCat(prim.surface);
+      if (rs && os && rs !== os) add('warn', `Surface: AFAC says ${esc(r.surf)}, OpenStreetMap says ${esc(prim.surface)}. AFAC's is used for the color.`);
+      prim.width = prim.manual ? (r.wid_m || 15) : (r.wid_m || prim.width || 15);
+      if (!r.wid_m && !prim.width) add('info', 'No width in either source; drawn 15 m wide.');
+    }
+
+    if (osm && !osm.failed){
+      const nA = osm.aprons.length, nT = osm.taxi.length, nH = osm.hangars.length;
+      add(nA + nT ? 'ok' : 'info', nA + nT + nH
+        ? `Also from OpenStreetMap: ${[nA && nA + ' ramp area' + (nA > 1 ? 's' : ''), nT && nT + ' taxiway' + (nT > 1 ? 's' : ''), nH && nH + ' hangar' + (nH > 1 ? 's' : '')].filter(Boolean).join(', ')}.`
+        : 'OpenStreetMap has no ramp or taxiways mapped here. The KML will have the runway only.');
+    }
+
+    $('checks').innerHTML = checks.join('');
+    geoMsg('', '');
+    geo = prim ? { runways, prim } : null;
+    $('stepOut').hidden = !geo;
+    if (geo) draw();
+  }
+
+  // ---------- airfield box: runway-aligned rectangle around runway + ramp/taxiways, plus margin ----------
+  function boxAround(prim, extras, margin){
+    const f = enu(prim.a), A = f.to(prim.a), B = f.to(prim.b), L = Math.hypot(B[0], B[1]);
+    const ux = B[0]/L, uy = B[1]/L, nx = uy, ny = -ux;
+    const w = (prim.width || 15) / 2;
+    let amin = 0, amax = L, cmin = -w, cmax = w;
+    for (const p of extras){
+      const q = f.to(p), a = q[0]*ux + q[1]*uy, c = q[0]*nx + q[1]*ny;
+      if (a < amin) amin = a; if (a > amax) amax = a; if (c < cmin) cmin = c; if (c > cmax) cmax = c;
+    }
+    amin -= margin; amax += margin; cmin -= margin; cmax += margin;
+    const pt = (a, c) => f.from([ux*a + nx*c, uy*a + ny*c]);
+    return [pt(amin, cmin), pt(amax, cmin), pt(amax, cmax), pt(amin, cmax), pt(amin, cmin)];
+  }
+  function runwayPoly(rw){
+    const b = brg(rw.a, rw.b), w = (rw.width || 15) / 2;
+    const p = [dest(rw.a, b - 90, w), dest(rw.b, b - 90, w), dest(rw.b, b + 90, w), dest(rw.a, b + 90, w)];
+    p.push(p[0]); return p;
+  }
+
+  function layers(){
+    const { runways, prim } = geo;
+    const cat = surfCat(rec.surf) || surfCat(prim.surface) || 'unknown';
+    const C = SURF[cat];
+    // ramp/taxiways near the runway only (Overpass radius can catch a neighbor's)
+    const near = pts => pts.some(p => Math.abs(track(prim.a, prim.b, p).cross) < 800);
+    const aprons = osm && !manualEnds ? osm.aprons.filter(x => near(x.pts)) : (osm ? osm.aprons.filter(x => near(x.pts)) : []);
+    const taxi = osm ? osm.taxi.filter(x => near(x.pts)) : [];
+    const hangars = osm ? osm.hangars.filter(x => near(x.pts)) : [];
+    const margin = Math.max(0, Math.min(500, parseFloat($('buf').value) || 0));
+    const extras = [...runways.slice(1).flatMap(r => runwayPoly(r)), ...aprons.flatMap(x => x.pts), ...taxi.flatMap(x => x.pts), ...hangars.flatMap(x => x.pts)];
+    const box = $('optBox').checked ? boxAround(prim, extras, margin) : null;
+    const rwyPolys = runways.map(rw => {
+      const c = SURF[(rw === prim ? cat : (surfCat(rw.surface) || cat))];
+      return { rw, poly: runwayPoly(rw), C: c };
+    });
+    return { cat, C, aprons: aprons.map(x => ({ ...x, C: SURF[surfCat(x.surface) || cat] })), taxi, hangars, box, rwyPolys, margin };
+  }
+
+  // ---------- preview map (Leaflet) ----------
+  let map = null, overlay = null, baseLayers = null, fitFor = null;
+  const BASE_KEY = 'airfieldKml.base';
+  function ensureMap(){
+    if (map || !window.L) return !!map;
+    map = L.map('map', { zoomControl:true, attributionControl:true });
+    baseLayers = {
+      'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { maxZoom:19, attribution:'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community' }),
+      'Map': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { maxZoom:19, attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' }),
+      'Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        { maxZoom:17, subdomains:'abc', attribution:'© OpenStreetMap contributors, SRTM · style © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA)' }),
+    };
+    let base = 'Satellite'; try { base = localStorage.getItem(BASE_KEY) || base; } catch(e){}
+    (baseLayers[base] || baseLayers.Satellite).addTo(map);
+    L.control.layers(baseLayers, null, { collapsed:false, position:'topright' }).addTo(map);
+    L.control.scale({ imperial:true, metric:true }).addTo(map);
+    map.on('baselayerchange', e => { try { localStorage.setItem(BASE_KEY, e.name); } catch(err){} });
+    overlay = L.layerGroup().addTo(map);
+    return true;
+  }
+
+  function draw(){
+    const Ly = layers(), pr = geo.prim, b = brg(pr.a, pr.b);
+    if (!ensureMap()){ $('outStatus').className = 'status warn'; $('outStatus').textContent = 'The preview map didn\'t load (no connection to the map library?). The KML can still be sent.'; }
+    if (map){
+      map.invalidateSize();
+      overlay.clearLayers();
+      const ll = pts => pts.map(p => [p[0], p[1]]);
+      if (Ly.box) L.polygon(ll(Ly.box), { color:Ly.C.box, weight:1.5, opacity:.8, fillColor:Ly.C.box, fillOpacity:.35 }).bindTooltip(`Airfield box (+${Ly.margin} m)`).addTo(overlay);
+      Ly.aprons.forEach(a => L.polygon(ll(a.pts), { color:a.C.ramp, weight:1, fillColor:a.C.ramp, fillOpacity:.9 }).bindTooltip('Ramp (OpenStreetMap)').addTo(overlay));
+      Ly.taxi.forEach(t => (t.closed ? L.polygon(ll(t.pts), { color:Ly.C.ramp, weight:1, fillColor:Ly.C.ramp, fillOpacity:.9 }) : L.polyline(ll(t.pts), { color:Ly.C.ramp, weight:5, lineCap:'round' })).bindTooltip('Taxiway' + (t.ref ? ' ' + esc(t.ref) : '') + ' (OpenStreetMap)').addTo(overlay));
+      Ly.hangars.forEach(g => L.polygon(ll(g.pts), { color:'#e7e4dc', weight:1, fillColor:Ly.C.rwy, fillOpacity:.85 }).bindTooltip('Hangar (OpenStreetMap)').addTo(overlay));
+      Ly.rwyPolys.forEach(x => {
+        L.polygon(ll(x.poly), { color:'#ffffff', weight:1.5, fillColor:x.C.rwy, fillOpacity:1 }).bindTooltip(x.rw === pr && pr.labA ? `RWY ${pr.labA}/${pr.labB}` : 'Runway').addTo(overlay);
+        L.polyline(ll([x.rw.a, x.rw.b]), { color:'#ffffff', weight:1, dashArray:'8 6' }).addTo(overlay);
+      });
+      const lbl = (p, t) => L.marker(p, { interactive:false, icon:L.divIcon({ className:'rwy-lbl', html:esc(t), iconSize:[30, 16], iconAnchor:[15, 8] }) }).addTo(overlay);
+      if (pr.labA) lbl(dest(pr.a, b + 180, 40), pr.labA);
+      if (pr.labB) lbl(dest(pr.b, b, 40), pr.labB);
+      if (rec.lat != null) L.circleMarker([rec.lat, rec.lon], { radius:6, color:'#3fa7a0', weight:2, fill:false }).bindTooltip(`AFAC reference point ${rec.lat.toFixed(5)}, ${rec.lon.toFixed(5)}`).addTo(overlay);
+      const key = (rec.des || '') + rec.name + (manualEnds ? 'm' : '');
+      if (fitFor !== key){ fitFor = key; const all = [...(Ly.box || []), ...Ly.rwyPolys.flatMap(x => x.poly)]; map.fitBounds(L.latLngBounds(all), { padding:[24, 24], maxZoom:17 }); }
+    }
+    $('legend').innerHTML = `<span><i style="background:${Ly.C.rwy}"></i>Runway (${Ly.C.label})</span><span><i style="background:${Ly.C.ramp}"></i>Ramp / taxiways</span>${Ly.box ? `<span><i style="background:${Ly.C.box};opacity:.6"></i>Airfield box (+${Ly.margin} m)</span>` : ''}<span><i style="background:transparent;border:2px solid #3fa7a0;border-radius:50%"></i>AFAC point</span>`;
+    sources(Ly);
+  }
+
+  // per-piece source list, shown under the map (and summarized in the KML description)
+  function sources(Ly){
+    const r = rec, pr = geo.prim, osmWay = id => `<a href="https://www.openstreetmap.org/way/${id}" target="_blank" rel="noopener">way ${id}</a>`;
+    const afac = `<a href="${esc(DATA.source.url)}" target="_blank" rel="noopener">AFAC "Aeródromos y helipuertos" list</a>, ${esc(DATA.source.edition || 'current')} edition`;
+    const items = [
+      `<b>Name, reference point, elevation, runway numbers, length, width, surface, permit:</b> ${afac}. It's the same official list <a href="https://airports.robrc.net/?q=${encodeURIComponent(r.des || r.name)}&vigente=&view=map" target="_blank" rel="noopener">airports.robrc.net</a> uses (this app reads it straight from gob.mx, without robrc's corrections).`,
+      manualEnds ? `<b>Runway position and direction:</b> the runway ends you entered. Width from AFAC (${r.wid_m ?? 15} m).`
+        : `<b>Runway position and direction:</b> OpenStreetMap ${osmWay(pr.id)}${osm.runways.length > 1 ? ` (+${osm.runways.length - 1} more: ${osm.runways.slice(1).map(x => osmWay(x.id)).join(', ')})` : ''}. Width from ${r.wid_m ? 'AFAC' : (pr.width ? 'OpenStreetMap' : 'a 15 m default')} (${Math.round(pr.width)} m).`,
+      Ly.aprons.length || Ly.taxi.length || Ly.hangars.length
+        ? `<b>Ramp, taxiways, hangars:</b> OpenStreetMap ${[...Ly.aprons, ...Ly.taxi, ...Ly.hangars].map(x => osmWay(x.id)).join(', ')}.`
+        : '<b>Ramp, taxiways:</b> none mapped in OpenStreetMap.',
+      `<b>Runway end labels:</b> AFAC's runway numbers, each placed at the end it belongs to by the runway's direction (worked out by this app).`,
+      `<b>Colors:</b> from the surface (AFAC: ${esc(r.surf || 'not given')}).`,
+      `<b>Airfield box:</b> worked out by this app, a runway-aligned rectangle around the runway, ramp and taxiways plus ${Ly.margin} m.`,
+      `<b>Preview base maps</b> (not in the KML): Esri World Imagery, OpenStreetMap, OpenTopoMap.`,
+    ];
+    $('srcList').innerHTML = items.map(x => `<li>${x}</li>`).join('');
+  }
+
+  // ---------- KML ----------
+  function buildKml(){
+    const L = layers(), r = rec, pr = geo.prim, b = brg(pr.a, pr.b);
+    const c = pts => pts.map(p => `${p[1].toFixed(7)},${p[0].toFixed(7)},0`).join(' ');
+    const poly = (name, style, pts) => `<Placemark><name>${esc(name)}</name><styleUrl>#${style}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${c(pts)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
+    const line = (name, style, pts) => `<Placemark><name>${esc(name)}</name><styleUrl>#${style}</styleUrl><LineString><coordinates>${c(pts)}</coordinates></LineString></Placemark>`;
+    const point = (name, pt, descr) => `<Placemark><name>${esc(name)}</name>${descr ? `<description><![CDATA[${descr}]]></description>` : ''}<styleUrl>#lbl</styleUrl><Point><coordinates>${c([pt])}</coordinates></Point></Placemark>`;
+    const st = (id, lineHex, lineA, w, fillHex, fillA) => `<Style id="${id}"><LineStyle><color>${kmlColor(lineHex, lineA)}</color><width>${w}</width></LineStyle>${fillHex ? `<PolyStyle><color>${kmlColor(fillHex, fillA)}</color></PolyStyle>` : '<PolyStyle><fill>0</fill></PolyStyle>'}</Style>`;
+    const src = manualEnds ? 'runway ends entered by the user' : 'runway, ramp, taxiway and hangar shapes © OpenStreetMap contributors (ODbL)';
+    const len = Math.round(dist(pr.a, pr.b));
+    const descr = [
+      `<b>${esc(r.des || '')} ${esc(r.name)}</b>, ${esc([r.muni, r.state].filter(Boolean).join(', '))}`,
+      r.rwy.length ? `RWY ${r.rwy.map(pad2).join('/')} · ${r.len_m ? r.len_m.toLocaleString() + ' × ' + (r.wid_m ?? '?') + ' m (' + ft(r.len_m).toLocaleString() + ' × ' + (r.wid_m ? ft(r.wid_m) : '?') + ' ft)' : ''} · ${esc(r.surf || '')} (AFAC)` : '',
+      `Mapped length ${len.toLocaleString()} m (${ft(len).toLocaleString()} ft)`,
+      r.elev_m != null ? `Elev ${r.elev_m} m / ${ft(r.elev_m).toLocaleString()} ft (AFAC)` : '',
+      [r.ops, r.svc].filter(Boolean).map(esc).join(' · '),
+      `AFAC permit ${esc(r.file || '—')}, ${esc(r.status || '')}${r.expires ? ', expires ' + fmtDate(r.expires) : ''}`,
+      '',
+      `Sources: AFAC "Aeródromos y helipuertos" list (gob.mx, ${esc(DATA.source.edition || 'current')} edition); ${src}. With thanks to airports.robrc.net.`,
+      `Built ${fmtDate(new Date().toISOString())} with GeezerGeek Pilot Airfield KML Builder.`,
+      '<b>NOT FOR NAVIGATION.</b>',
+    ].filter(x => x !== null).join('<br/>');
+    const C = L.C;
+    let k = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>\n<name>${esc((r.des ? r.des + ' ' : '') + r.name)}</name>\n<description><![CDATA[${descr}]]></description>\n`;
+    k += st('box', C.box, 'b0', 1.5, C.box, '59') + st('ramp', C.ramp, 'ff', 1, C.ramp, 'e6') + st('twy', C.ramp, 'ff', 4, null) + st('bldg', '#e7e4dc', 'ff', 1, C.rwy, 'd9') + `<Style id="lbl"><IconStyle><scale>0.6</scale></IconStyle><LabelStyle><scale>1.0</scale></LabelStyle></Style>\n`;
+    L.rwyPolys.forEach((x, i) => { k += st('rwy' + i, '#ffffff', 'ff', 1.5, x.C.rwy, 'ff'); });
+    k += st('cl', '#ffffff', 'ff', 1, null);
+    if (L.box) k += `<Folder><name>Airfield box (+${L.margin} m)</name>${poly('Airfield', 'box', L.box)}</Folder>\n`;
+    if (L.aprons.length || L.taxi.length || L.hangars.length){
+      k += '<Folder><name>Ramp and taxiways</name>';
+      L.aprons.forEach(a => { k += poly('Ramp', 'ramp', a.pts); });
+      L.taxi.forEach(t => { k += t.closed ? poly('Taxiway', 'ramp', t.pts) : line('Taxiway' + (t.ref ? ' ' + t.ref : ''), 'twy', t.pts); });
+      L.hangars.forEach(g => { k += poly('Hangar', 'bldg', g.pts); });
+      k += '</Folder>\n';
+    }
+    k += '<Folder><name>Runways</name>';
+    L.rwyPolys.forEach((x, i) => {
+      const nm = x.rw === pr && pr.labA ? `RWY ${pr.labA}/${pr.labB}` : (x.rw.ref ? 'RWY ' + x.rw.ref : 'Runway');
+      k += poly(nm, 'rwy' + i, x.poly) + line(nm + ' centerline', 'cl', [x.rw.a, x.rw.b]);
+    });
+    if (pr.labA) k += point(pr.labA, dest(pr.a, b + 180, 40));
+    if (pr.labB) k += point(pr.labB, dest(pr.b, b, 40));
+    k += '</Folder>\n';
+    const ref = r.lat != null ? [r.lat, r.lon] : [(pr.a[0] + pr.b[0]) / 2, (pr.a[1] + pr.b[1]) / 2];
+    k += point(r.des || r.name, ref, descr);
+    k += '\n</Document></kml>\n';
+    return k;
+  }
+  const fileName = () => `${(rec.des || 'airfield')}_${rec.name}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '.kml';
+
+  async function share(){
+    const kml = buildKml(), name = fileName();
+    const file = new File([kml], name, { type: 'application/vnd.google-earth.kml+xml' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })){
+      try { await navigator.share({ files: [file], title: name }); $('outStatus').className = 'status ok'; $('outStatus').textContent = 'Shared ' + name + '.'; return; }
+      catch (e){ if (e && e.name === 'AbortError') return; }
+    }
+    download(kml, name);
+  }
+  function download(kml, name){
+    kml = kml || buildKml(); name = name || fileName();
+    const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    $('outStatus').className = 'status ok'; $('outStatus').textContent = 'Downloaded ' + name + '. AirDrop or email it to the iPad and open it in ForeFlight.';
+  }
+
+  // ---------- manual ends ----------
+  const parseLL = s => { const m = String(s).match(/(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)/); if (!m) return null; const la = +m[1], lo = +m[2]; return Math.abs(la) <= 90 && Math.abs(lo) <= 180 ? [la, lo] : null; };
+  $('btnManual').addEventListener('click', () => {
+    const a = parseLL($('endA').value), b = parseLL($('endB').value);
+    $('endA').classList.toggle('bad', !a); $('endB').classList.toggle('bad', !b);
+    if (!a || !b) return;
+    if (dist(a, b) < 150 || dist(a, b) > 6000){ geoMsg('warn', 'Those two ends are ' + Math.round(dist(a, b)) + ' m apart, which doesn\'t look like a runway. Check them.'); return; }
+    manualEnds = [a, b]; build();
+  });
+  $('btnManualClear').addEventListener('click', () => { manualEnds = null; $('endA').value = ''; $('endB').value = ''; build(); });
+
+  // ---------- wiring ----------
+  let t = null;
+  $('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(search, 120); });
+  $('q').addEventListener('keydown', e => { if (e.key === 'Enter'){ const li = $('results').querySelector('li'); if (li) li.click(); } });
+  $('btnShare').addEventListener('click', share);
+  $('btnDownload').addEventListener('click', () => download());
+  $('buf').addEventListener('input', () => { save(); if (geo) draw(); });
+  $('optBox').addEventListener('change', () => { save(); if (geo) draw(); });
+
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify({ des: rec ? rec.des : '', name: rec ? rec.name : '', buf: $('buf').value, box: $('optBox').checked })); } catch(e){} }
+  function load(){ let s = {}; try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){} if (s.buf) $('buf').value = s.buf; if (s.box === false) $('optBox').checked = false; return s; }
+
+  // ---- open counter (App Conventions §6b; Tally, counts silently, never blocks the app) ----
+  fetch('https://tally.yuki.sh/counters/wamware/airfield-kml-builder', { method: 'POST' }).catch(() => {});
+
+  loadList();
+})();
+</script>
+<!-- GGP-FOOTER-JS START v1.14 · 13-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<script>
+(() => {
+  if (window.__ggpFooter) return;
+  window.__ggpFooter = true;
+  // Every app's footer share button shares the Control Panel, not the app itself.
+  const SHARE_URL   = 'https://geezer-geek-pilot-control-panel.netlify.app/';
+  const SHARE_TITLE = 'GeezerGeek Pilot Apps';
+  const SHARE_TEXT  = 'Planning, weather, ATC-practice and safety tools for GA pilots, from GeezerGeek Pilot.';
+  const flash = (btn) => {
+    if (btn.dataset.ggpBusy) return;
+    btn.dataset.ggpBusy = '1';
+    const label = btn.querySelector('span') || btn;
+    const original = label.textContent;
+    label.textContent = label === btn ? 'Link copied!' : 'Link copied to clipboard!';
+    setTimeout(() => { label.textContent = original; delete btn.dataset.ggpBusy; }, 2200);
+  };
+  // One listener on the document, so it also covers footers an app draws later and any other
+  // button given the ggp-share class.
+  document.addEventListener('click', async (ev) => {
+    const btn = ev.target instanceof Element ? ev.target.closest('.ggp-share') : null;
+    if (!btn) return;
+    ev.preventDefault();
+    if (navigator.share) {
+      try { await navigator.share({ title: SHARE_TITLE, text: SHARE_TEXT, url: SHARE_URL }); return; }
+      catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
+    }
+    try {
+      await navigator.clipboard.writeText(SHARE_URL);
+      flash(btn);
+    } catch (err) {
+      window.location.href = 'mailto:?subject=' + encodeURIComponent(SHARE_TITLE)
+        + '&body=' + encodeURIComponent(SHARE_TEXT + ' ' + SHARE_URL);
+    }
+  });
+  // v1.6 feedback: any element with class ggp-feedback opens an email to Wayne naming its data-app.
+  // If no email app takes over within ~1.5 s (page still focused), show the address with a Copy button.
+  document.addEventListener('click', (ev) => {
+    const btn = ev.target instanceof Element ? ev.target.closest('.ggp-feedback') : null;
+    if (!btn) return;
+    ev.preventDefault();
+    const addr = ['waynemcc', 'wamware.com'].join('@');
+    const app = btn.dataset.app || document.title;
+    const subject = 'GeezerGeek feedback: ' + app;
+    // v1.8: subject only, empty body (no page link or device string), per Wayne
+    let left = false;
+    const onLeave = () => { left = true; };
+    window.addEventListener('blur', onLeave, { once: true });
+    document.addEventListener('visibilitychange', onLeave, { once: true });
+    window.location.href = 'mailto:' + addr + '?subject=' + encodeURIComponent(subject);
+    setTimeout(() => {
+      window.removeEventListener('blur', onLeave);
+      document.removeEventListener('visibilitychange', onLeave);
+      if (left || !document.hasFocus()) return;           // an email app opened
+      const host = btn.parentElement;
+      if (host.querySelector('.ggp-fb-note')) return;
+      const note = document.createElement('div');
+      note.className = 'ggp-fb-note';
+      note.setAttribute('role', 'status');
+      note.innerHTML = 'No email app opened? Write to <b></b><button type="button">Copy address</button>';
+      note.querySelector('b').textContent = addr;
+      note.querySelector('button').addEventListener('click', async (e) => {
+        try { await navigator.clipboard.writeText(addr); e.target.textContent = 'Copied'; }
+        catch (err) { e.target.textContent = 'Select it above'; }
+      });
+      host.appendChild(note);
+    }, 1500);
+  });
+  // v1.12: every app also hits one shared Tally counter, so its `visitor` = unique visitors across all apps
+  // (the Open Counts page shows it as "unique since 10-Nov-2026"). Pages that are not apps carry
+  // data-ggp-all="off" on their footer. The Quiz draws its footer later, so a missing footer still counts.
+  if (!document.querySelector('.ggp-footer[data-ggp-all="off"]')) {
+    fetch('https://tally.yuki.sh/counters/wamware/ggp-all', { method: 'POST' }).catch(() => { /* never block the app */ });
+  }
+  // Open counter: shown only where the footer has #ggpCount (the Control Panel). Apps count silently.
+  const countEl = document.getElementById('ggpCount');
+  if (countEl) {
+    // v1.13: Tally (now "Tallyflare") moved to /counters/<ns>/<key>: POST records a visit and returns the
+    // counts, GET only reads. The old hits URLs return 404 since ~11-Nov-2026; counts carried over.
+    fetch('https://tally.yuki.sh/counters/wamware/geezer-geek-pilot-control-panel', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        const base = parseInt(countEl.dataset.base, 10) || 0;  // pre-Tally opens, App Conventions §6b
+        const n = d && typeof d.visit === 'number' ? d.visit + base : null;
+        if (typeof n !== 'number') return;
+        const text = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
+        const href = countEl.dataset.href;   // v1.4: the count links to the open-counts page
+        if (href) {
+          const a = document.createElement('a');
+          a.href = href; a.textContent = text; a.title = 'Open counts for every app';
+          countEl.replaceChildren(a);
+        } else countEl.textContent = text;
+      })
+      .catch(() => { /* counter is a nice-to-have, never block the app */ });
+  }
+})();
+</script>
+<!-- GGP-FOOTER-JS END -->
+</body>
+</html>

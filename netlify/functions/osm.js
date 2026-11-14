@@ -24,7 +24,7 @@ exports.handler = async (event) => {
   const lat = Number(q.lat), lon = Number(q.lon);
   if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return json(400, { error: 'lat and lon required' });
   const query = `[out:json][timeout:20];nwr(around:2500,${lat.toFixed(5)},${lon.toFixed(5)})[aeroway~"^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$"];out geom;`;
-  let last = '';
+  const errs = [];
   const started = Date.now();
   for (const url of SERVERS) {
     const left = 9000 - (Date.now() - started);          // stay inside Netlify's function time limit
@@ -37,13 +37,13 @@ exports.handler = async (event) => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'GeezerGeekPilot-AirfieldKML/0.3 (airfield-kml-builder.netlify.app)' },
         body: 'data=' + encodeURIComponent(query),
       });
-      if (!res.ok) { last = `${new URL(url).host}: HTTP ${res.status}`; continue; }
+      if (!res.ok) { errs.push(`${new URL(url).host}: HTTP ${res.status}`); continue; }
       const d = await res.json();
-      if (d.remark && /error|timeout|runtime/i.test(d.remark)) { last = `${new URL(url).host}: ${d.remark.slice(0, 80)}`; continue; }
+      if (d.remark && /error|timeout|runtime/i.test(d.remark)) { errs.push(`${new URL(url).host}: ${d.remark.slice(0, 80)}`); continue; }
       return json(200, { server: new URL(url).host, fetched: new Date().toISOString(), elements: d.elements || [] }, true);
     } catch (e) {
-      last = `${new URL(url).host}: ${e.name === 'AbortError' ? 'timed out' : e.message}`;
+      errs.push(`${new URL(url).host}: ${e.name === 'AbortError' ? 'timed out' : e.message}`);
     } finally { clearTimeout(timer); }
   }
-  return json(502, { error: last || 'no answer' });
+  return json(502, { error: errs.join('; ') || 'no answer' });
 };

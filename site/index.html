@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -231,9 +231,9 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.20</span>
+    <span class="ver mono">v0.21</span>
   </div>
-  <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
+  <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight (or Garmin Pilot) as a map layer.</p>
 
   <div class="panel">
 
@@ -299,7 +299,7 @@
     <section class="step" id="stepOut" hidden>
       <div class="step-num">5</div>
       <div class="step-body">
-        <h2>Preview and send to ForeFlight</h2>
+        <h2>Preview and send to ForeFlight or Garmin Pilot</h2>
         <p class="hint">This is what the KML will draw. Zoom and pan, and switch between Satellite, Map and Topo (top right) to check the shapes against the ground before sending. Colors follow the runway surface: asphalt black, concrete gray, dirt brown, gravel tan, grass green. The ramp and taxiways are a shade lighter, and the airfield box lighter still.</p>
         <div class="map" id="map" role="region" aria-label="Preview map of the airfield KML"></div>
         <div class="legend" id="legend"></div>
@@ -312,11 +312,11 @@
           <label><input type="checkbox" id="optBox" checked> Draw airfield box</label>
         </div>
         <div class="actions">
-          <button class="btn primary" id="btnOpenFF" type="button">Open in ForeFlight (iPhone/iPad)</button>
+          <button class="btn primary" id="btnOpenFF" type="button">Open in ForeFlight / Garmin Pilot (iPhone/iPad)</button>
           <button class="btn" id="btnShare" type="button">Share KML…</button>
           <button class="btn" id="btnDownload" type="button">Download .kml</button>
         </div>
-        <p class="hint" style="margin-top:8px">On iPhone or iPad, tap "Open in ForeFlight": the KML opens as a file from a web link. Tap the share button and choose ForeFlight (it may be under More), and ForeFlight imports it as a User Map Layer. "Share KML…" opens the share sheet directly, but iOS doesn't always list ForeFlight there. On a computer, download the file and AirDrop or email it to the iPad.</p>
+        <p class="hint" style="margin-top:8px">On iPhone or iPad, tap "Open in ForeFlight / Garmin Pilot": the KML opens as a file from a web link. Tap the share button and choose ForeFlight (it may be under More), and ForeFlight imports it as a User Map Layer. In Garmin Pilot, choose "Copy to Garmin Pilot", then turn it on under Map, Overlays, KML. (Garmin Pilot is untested so far: Garmin documents KML points, lines and shapes up to 4 MB, but not colors.) "Share KML…" opens the share sheet directly, but iOS doesn't always list ForeFlight there. On a computer, download the file and AirDrop or email it to the iPad.</p>
         <div class="status" id="outStatus" role="status" aria-live="polite"></div>
       </div>
     </section>

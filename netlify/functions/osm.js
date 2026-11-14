@@ -32,9 +32,12 @@ exports.handler = async (event) => {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), left);
     try {
+      // overpass-api.de answered 406 to a bare POST from Netlify (14-Nov-2026); send the headers a browser would
       const res = await fetch(url, {
         method: 'POST', signal: ctl.signal,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'GeezerGeekPilot-AirfieldKML/0.3 (airfield-kml-builder.netlify.app)' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Accept': 'application/json, text/plain, */*',
+                   'User-Agent': 'Mozilla/5.0 (compatible; GeezerGeekPilot-AirfieldKML/0.3; +https://airfield-kml-builder.netlify.app)',
+                   'Referer': 'https://airfield-kml-builder.netlify.app/' },
         body: 'data=' + encodeURIComponent(query),
       });
       if (!res.ok) { errs.push(`${new URL(url).host}: HTTP ${res.status}`); continue; }

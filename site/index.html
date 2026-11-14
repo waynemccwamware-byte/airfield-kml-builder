@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -214,7 +214,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.8</span>
+    <span class="ver mono">v0.9</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -532,8 +532,10 @@
     const hits = [];
     for (const a of ICAO.airports){
       const d = P ? dist(P, [a.lat, a.lon]) : null;
-      const sameCode = !!(r.des && a.local && a.local === r.des.toUpperCase());
-      if (sameCode || (d != null && d <= ICAO_RADIUS_M)) hits.push({ a, d, sameCode });
+      // a shared 3-letter code only counts when the two are also close (codes repeat across Mexico: LMB is
+      // both Rancho La Misión and Loma Bonita MMLB, 610 km apart)
+      const sameCode = !!(r.des && a.local && a.local === r.des.toUpperCase()) && (d == null || d <= 25000);
+      if (sameCode || (d != null && d <= ICAO_RADIUS_M)) hits.push({ a, d, sameCode, same: sameCode || (d != null && d <= 300) });
     }
     hits.sort((x, y) => (y.sameCode - x.sameCode) || ((x.d ?? 1e9) - (y.d ?? 1e9)));
     if (!hits.length){
@@ -541,10 +543,12 @@
         + (P ? '' : '<li class="warn">AFAC gives no position for this airfield, so only the local code could be checked.</li>');
       return;
     }
-    ul.innerHTML = hits.map(({ a, d, sameCode }) => {
+    ul.innerHTML = hits.map(({ a, d, sameCode, same }) => {
       const why = [sameCode ? `its local code ${esc(a.local)} matches AFAC's designator` : '', d != null ? `${(d / 1000).toFixed(1)} km (${(d / 1852).toFixed(1)} NM) from AFAC's point` : ''].filter(Boolean).join('; ');
       const src = a.sam ? `on Mexico's official airport list as ${esc(a.sam_type.toLowerCase())} "${esc(a.sam_name)}"` : `ICAO code from OurAirports${a.icao_in === 'oa-gps' ? ' (listed there as its GPS code)' : ''}; not on Mexico's official airport list`;
-      return `<li class="warn"><b>This looks like an ICAO airport: <span class="mono">${esc(a.code)}</span> ${esc(a.name)}</b> (${why}). ${src}. It should already be in ForeFlight and Garmin Pilot as ${esc(a.code)}, so you may not need this KML. Check there before building one.</li>`;
+      // same field (shared code nearby, or within 300 m) vs. a different strip that's merely close
+      if (same) return `<li class="warn"><b>This looks like an ICAO airport: <span class="mono">${esc(a.code)}</span> ${esc(a.name)}</b> (${why}). ${src}. It should already be in ForeFlight and Garmin Pilot as ${esc(a.code)}, so you may not need this KML. Check there before building one.</li>`;
+      return `<li class="info"><b>An ICAO airport is nearby: <span class="mono">${esc(a.code)}</span> ${esc(a.name)}</b> (${why}). ${src}. This may be a separate strip or the same field with a different reference point; compare them on the satellite view.</li>`;
     }).join('');
   }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -211,7 +211,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.5</span>
+    <span class="ver mono">v0.6</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check whether ForeFlight already shows it, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -222,7 +222,7 @@
       <div class="step-num">1</div>
       <div class="step-body">
         <h2>Find the airfield</h2>
-        <p class="hint">Search AFAC's list of aerodromes by designator (e.g. SBY), name or municipality.</p>
+        <p class="hint">Search AFAC's list of aerodromes by designator (e.g. SBY), name or municipality. It's the same official list that <a href="https://airports.robrc.net/" target="_blank" rel="noopener">airports.robrc.net</a> puts on a searchable map of Mexico. That site showed us the way to this data, and it's well worth a visit.</p>
         <input class="fld wide" id="q" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="SBY, Scorpion Bay, Comondú…" aria-label="Search AFAC aerodromes">
         <ul class="results" id="results" role="listbox" aria-label="Matching aerodromes"></ul>
         <div class="status" id="listStatus" role="status" aria-live="polite">Loading AFAC list…</div>

@@ -539,7 +539,7 @@
     }
     hits.sort((x, y) => (y.sameCode - x.sameCode) || ((x.d ?? 1e9) - (y.d ?? 1e9)));
     if (!hits.length){
-      ul.innerHTML = `<li class="ok">Not an ICAO airport. No ICAO-coded airport is within 3 km (1.6 NM) of AFAC's point${r.des ? `, and no ICAO airport uses ${esc(r.des)} as its local code` : ''}. Carry on.</li>`
+      ul.innerHTML = `<li class="ok">Not an ICAO airport. No ICAO-coded airport is within 3 km (1.6 NM) of AFAC's point${r.des ? `, and no ICAO airport near it shares the code ${esc(r.des)}` : ''}. Carry on.</li>`
         + (P ? '' : '<li class="warn">AFAC gives no position for this airfield, so only the local code could be checked.</li>');
       return;
     }

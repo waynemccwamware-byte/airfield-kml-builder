@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -123,6 +123,17 @@
   .checks li.warn::before{ color:var(--alert); }
   .checks li.info::before{ color:var(--amber); }
 
+  /* collapsible steps (v0.12): the head stays, everything else hides */
+  .sec-head{ display:flex; align-items:baseline; gap:8px; width:100%; background:none; border:0; padding:0; margin:0 0 2px; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+  .sec-head h2{ margin:0; }
+  .sec-head .chev{ font-size:11px; color:var(--amber); transition:transform .15s ease; flex:none; }
+  .sec-head .sum{ display:block; font-size:12px; color:var(--text-muted); margin-top:2px; line-height:1.4; }
+  .sec-head .sum.warn{ color:var(--alert); }
+  .sec-head .sum.ok{ color:var(--teal); }
+  .sec-head:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; border-radius:4px; }
+  .step.collapsed .sec-head .chev{ transform:rotate(-90deg); }
+  .step.collapsed .step-body > :not(.sec-head){ display:none !important; }
+  .step:not(.collapsed) .sec-head .sum{ display:none; }
   .lang{ display:inline-flex; border:1px solid var(--bezel-hi); border-radius:6px; overflow:hidden; float:right; margin:-2px 0 6px 10px; }
   .lang button{ background:var(--bg-deep); color:var(--text-muted); border:0; padding:5px 10px; font:500 12px 'IBM Plex Sans', sans-serif; cursor:pointer; }
   .lang button + button{ border-left:1px solid var(--bezel-hi); }
@@ -214,7 +225,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.11</span>
+    <span class="ver mono">v0.12</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -304,7 +315,7 @@
     </section>
 
     <!-- Credits -->
-    <section class="step">
+    <section class="step" id="stepInfo">
       <div class="step-num">i</div>
       <div class="step-body">
         <h2>Data and thanks</h2>
@@ -456,6 +467,28 @@
   }
   const pad2 = s => /^\d$/.test(String(s).trim()) ? '0' + String(s).trim() : String(s).trim();
 
+  // ---------- collapsible steps ----------
+  // Steps 2–4 start collapsed, each showing a one-line summary under its title; tap the title to open.
+  // A step opens by itself when it has a warning the pilot should see.
+  function makeCollapsible(id){
+    const sec = $(id), body = sec.querySelector('.step-body'), h2 = body.querySelector('h2');
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'sec-head'; btn.setAttribute('aria-expanded', 'true');
+    const wrap = document.createElement('span'); wrap.style.flex = '1';
+    const sum = document.createElement('span'); sum.className = 'sum';
+    const chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '▼'; chev.setAttribute('aria-hidden', 'true');
+    body.insertBefore(btn, body.firstChild);
+    wrap.appendChild(h2); wrap.appendChild(sum); btn.appendChild(chev); btn.appendChild(wrap);
+    btn.addEventListener('click', () => setOpen(id, sec.classList.contains('collapsed')));
+  }
+  function setOpen(id, open){
+    const sec = $(id); sec.classList.toggle('collapsed', !open);
+    sec.querySelector('.sec-head').setAttribute('aria-expanded', String(open));
+  }
+  function setSum(id, text, cls){ const el = $(id).querySelector('.sec-head .sum'); el.textContent = text; el.className = 'sum' + (cls ? ' ' + cls : ''); }
+  ['stepRec', 'stepFF', 'stepGeo', 'stepInfo'].forEach(makeCollapsible);
+  setOpen('stepInfo', true);
+
   // ---------- 2. record (English / Español) ----------
   // English shows AFAC's Spanish values translated; Español shows them exactly as AFAC publishes them.
   const LABELS = {
@@ -518,6 +551,7 @@
       [T.coord, esc(r.coord_apt || '—')],
     ];
     $('recTable').innerHTML = rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+    setSum('stepRec', [r.rwy.length ? (lang === 'es' ? 'Pista ' : 'RWY ') + r.rwy.map(pad2).join('/') : '', r.len_m ? `${r.len_m.toLocaleString()} × ${r.wid_m ?? '?'} m` : '', tr(r.surf), tr(r.ops), tr(r.svc), cur ? '' : (lang === 'es' ? 'NO VIGENTE' : 'NOT CURRENT')].filter(Boolean).join(' · '), cur ? '' : 'warn');
   }
 
   // ---------- 3. ICAO check ----------
@@ -539,6 +573,10 @@
       if (sameCode || (d != null && d <= ICAO_RADIUS_M)) hits.push({ a, d, sameCode, same: sameCode || (d != null && d <= 300) });
     }
     hits.sort((x, y) => (y.sameCode - x.sameCode) || ((x.d ?? 1e9) - (y.d ?? 1e9)));
+    const sameHit = hits.find(h => h.same);
+    if (!hits.length) setSum('stepFF', 'Not an ICAO airport', 'ok');
+    else if (sameHit){ setSum('stepFF', `Looks like ICAO airport ${sameHit.a.code} (${sameHit.a.name})`, 'warn'); setOpen('stepFF', true); }
+    else setSum('stepFF', `Not the same field, but ICAO airport ${hits[0].a.code} is ${(hits[0].d / 1000).toFixed(1)} km away`);
     if (!hits.length){
       ul.innerHTML = `<li class="ok">Not an ICAO airport. No ICAO-coded airport is within 3 km (1.6 NM) of AFAC's point${r.des ? `, and no ICAO airport near it shares the code ${esc(r.des)}` : ''}. Carry on.</li>`
         + (P ? '' : '<li class="warn">AFAC gives no position for this airfield, so only the local code could be checked.</li>');
@@ -559,6 +597,8 @@
     $('endA').value = ''; $('endB').value = '';
     save();
     $('recTitle').textContent = `${r.des || '—'} · ${r.name}`;
+    setOpen('stepRec', false); setOpen('stepFF', false); setOpen('stepGeo', false);
+    setSum('stepFF', 'Checking…'); setSum('stepGeo', 'Looking up OpenStreetMap…');
     showRecord(r);
     const has = r.lat != null;
     $('lnkRobrc').href = 'https://airports.robrc.net/?q=' + encodeURIComponent(r.des || r.name) + '&vigente=&view=map';
@@ -649,7 +689,8 @@
       geoMsg('warn', `OpenStreetMap didn't answer (${err}). Tap Retry in a minute, or mark the runway ends on the map below.`);
       $('checks').innerHTML = '<li class="warn"><button class="btn" id="btnRetry" type="button">Retry OpenStreetMap</button></li>';
       $('btnRetry').addEventListener('click', () => fetchOsm(true));
-      osm = null; geo = null; $('stepOut').hidden = false; draw(); return;
+      osm = null; geo = null; $('stepOut').hidden = false; draw();
+      setSum('stepGeo', "OpenStreetMap didn't answer: Retry, or mark the ends on the map", 'warn'); setOpen('stepGeo', true); return;
     }
     try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), els: data.elements || [] })); } catch(e){}
     osm = parseOsm(data.elements || []); osm.server = data.server || '';
@@ -756,6 +797,16 @@
     }
 
     $('checks').innerHTML = checks.join('');
+    {
+      const warn = checks.some(c => c.startsWith('<li class="warn"'));
+      const bits = [];
+      if (prim) bits.push(manualEnds ? 'Runway from your ends' : 'Runway from OpenStreetMap');
+      else bits.push('No runway yet');
+      if (prim && r.len_m) bits.push(`length ${((dist(prim.a, prim.b) - r.len_m) / r.len_m * 100 >= 0 ? '+' : '')}${((dist(prim.a, prim.b) - r.len_m) / r.len_m * 100).toFixed(1)}% vs AFAC`);
+      if (osm) bits.push(osm.aprons.length + osm.taxi.length ? 'ramp/taxiways mapped' : 'no ramp mapped');
+      setSum('stepGeo', bits.join(' · ') + (warn ? ' · check the notes' : ''), warn ? 'warn' : (prim ? 'ok' : ''));
+      if (!prim) setOpen('stepGeo', true);
+    }
     const rf = $('lnkRefresh'); if (rf) rf.addEventListener('click', e => { e.preventDefault(); fetchOsm(true); });
     geoMsg('', '');
     geo = prim ? { runways, prim } : null;

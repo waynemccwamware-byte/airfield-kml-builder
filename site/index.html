@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -211,7 +211,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.3</span>
+    <span class="ver mono">v0.4</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check whether ForeFlight already shows it, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -286,7 +286,7 @@
         <h2 style="margin-top:12px">Where each piece comes from</h2>
         <ul class="srcs" id="srcList"></ul>
         <div class="opts">
-          <label>Airfield box margin <input class="fld small" id="buf" inputmode="numeric" value="20" aria-label="Airfield box margin in meters"> m</label>
+          <label>Airfield box margin <input class="fld small" id="buf" inputmode="numeric" value="50" aria-label="Airfield box margin in meters"> m</label>
           <label><input type="checkbox" id="optBox" checked> Draw airfield box</label>
         </div>
         <div class="actions">
@@ -333,7 +333,7 @@
 (function(){
   'use strict';
   const $ = id => document.getElementById(id);
-  const KEY = 'airfieldKml.v1';
+  const KEY = 'airfieldKml.v2';   // v2 (v0.4): box margin default 50 m, so an earlier saved 20 m is dropped
   const R = 6371008.8;
   const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

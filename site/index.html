@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -214,7 +214,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.9</span>
+    <span class="ver mono">v0.10</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -286,6 +286,7 @@
         <p class="hint">This is what the KML will draw. Zoom and pan, and switch between Satellite, Map and Topo (top right) to check the shapes against the ground before sending. Colors follow the runway surface: asphalt black, concrete gray, dirt brown, gravel tan, grass green. The ramp and taxiways are a shade lighter, and the airfield box lighter still.</p>
         <div class="map" id="map" role="region" aria-label="Preview map of the airfield KML"></div>
         <div class="legend" id="legend"></div>
+        <div class="actions"><button class="btn" id="btnPick" type="button">Mark runway ends on the map</button></div>
         <h2 style="margin-top:12px">Where each piece comes from</h2>
         <ul class="srcs" id="srcList"></ul>
         <div class="opts">
@@ -415,9 +416,8 @@
       const ed = d.source.edition ? d.source.edition + ' edition' : 'current edition';
       $('afacEdition').innerHTML = `<a href="${esc(d.source.url)}" target="_blank" rel="noopener">${esc(ed)}</a> (${d.source.count.toLocaleString()} aerodromes with a runway or water area; heliports left out).`;
       $('listStatus').textContent = `${d.source.count.toLocaleString()} aerodromes from AFAC's list, ${ed}.`;
-      const saved = load();
-      if (saved.des){ const hit = DATA.records.find(x => x.des === saved.des && x.name === saved.name); if (hit){ $('q').value = hit.des; pick(hit); return; } }
-      search();
+      load();          // box settings only; the search starts empty (v0.10)
+      $('q').value = '';
     } catch (e){
       $('listStatus').className = 'status warn';
       $('listStatus').textContent = 'Could not load AFAC\'s list: ' + e.message + '. Try again in a minute.';
@@ -572,6 +572,7 @@
     $('stepGeo').hidden = false; $('stepOut').hidden = true;
     $('checks').innerHTML = '';
     if (!has){ geoMsg('warn', 'AFAC gives no position for this airfield, so there is nothing to look up. Enter the runway ends yourself below.'); $('manual').open = true; return; }
+    $('stepOut').hidden = false; draw();     // the map shows AFAC's point straight away (v0.10)
     fetchOsm();
   }
   const geoMsg = (cls, t) => { $('geoStatus').className = 'status ' + (cls || ''); $('geoStatus').textContent = t; };
@@ -600,6 +601,29 @@
     throw new Error(last || 'no answer');
   }
 
+  // same as the server function's first source: OSM's main API, a ~3 km box, aeroway features only
+  async function osmApiDirect(lat, lon){
+    const dLat = 0.0135, dLon = 0.0135 / Math.cos(rad(lat));
+    const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(v => v.toFixed(5)).join(',');
+    const c = new AbortController(), timer = setTimeout(() => c.abort(), 20000);
+    try {
+      const res = await fetch('https://api.openstreetmap.org/api/0.6/map.json?bbox=' + bbox, { signal:c.signal });
+      if (!res.ok) throw new Error('OSM API HTTP ' + res.status);
+      const d = await res.json(), nodes = new Map(), ways = new Map(), out = [];
+      for (const e of d.elements || []){ if (e.type === 'node') nodes.set(e.id, e); else if (e.type === 'way') ways.set(e.id, e); }
+      const geom = w => w.nodes.map(id => nodes.get(id)).filter(Boolean).map(n => ({ lat:n.lat, lon:n.lon }));
+      for (const e of d.elements || []){
+        const a = e.tags && e.tags.aeroway;
+        if (!a || !/^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$/.test(a)) continue;
+        if (e.type === 'node') out.push({ type:'node', id:e.id, lat:e.lat, lon:e.lon, tags:e.tags });
+        else if (e.type === 'way') out.push({ type:'way', id:e.id, tags:e.tags, geometry:geom(e) });
+        else if (e.type === 'relation') out.push({ type:'relation', id:e.id, tags:e.tags, members:(e.members || []).filter(m => m.type === 'way' && ways.has(m.ref)).map(m => ({ type:'way', ref:m.ref, role:m.role, geometry:geom(ways.get(m.ref)) })) });
+      }
+      return { server:'api.openstreetmap.org', elements:out };
+    } catch (e){ throw new Error(e.name === 'AbortError' ? 'OSM API: no answer in 20 s' : e.message); }
+    finally { clearTimeout(timer); }
+  }
+
   async function fetchOsm(force){
     const r = rec;
     const key = OSM_CACHE + r.lat.toFixed(5) + ',' + r.lon.toFixed(5);
@@ -617,16 +641,17 @@
       const d = await res.json();
       if (res.ok && Array.isArray(d.elements)) data = d; else err = d.error || ('HTTP ' + res.status);
     } catch (e){ err = 'cache server busy'; }
-    if (!data){ try { data = await overpass(q); } catch (e){ err = e.message; } }
+    if (!data){ try { data = await osmApiDirect(r.lat, r.lon); } catch (e){ err = (err ? err + '; ' : '') + e.message; } }
+    if (!data){ try { data = await overpass(q); } catch (e){ err = (err ? err + '; ' : '') + e.message; } }
     if (rec !== r) return;     // user picked another airfield meanwhile
     if (!data){
-      geoMsg('warn', `OpenStreetMap's data servers didn't answer (${err}). Tap Retry in a minute, or enter the runway ends yourself.`);
+      geoMsg('warn', `OpenStreetMap didn't answer (${err}). Tap Retry in a minute, or mark the runway ends on the map below.`);
       $('checks').innerHTML = '<li class="warn"><button class="btn" id="btnRetry" type="button">Retry OpenStreetMap</button></li>';
       $('btnRetry').addEventListener('click', () => fetchOsm(true));
-      osm = null; $('stepOut').hidden = true; return;
+      osm = null; geo = null; $('stepOut').hidden = false; draw(); return;
     }
     try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), els: data.elements || [] })); } catch(e){}
-    osm = parseOsm(data.elements || []);
+    osm = parseOsm(data.elements || []); osm.server = data.server || '';
     build();
   }
 
@@ -720,6 +745,7 @@
       if (!r.wid_m && !prim.width) add('info', 'No width in either source; drawn 15 m wide.');
     }
 
+    if (osm && osm.server && !osm.cachedAt) add('info', `OpenStreetMap data via ${esc(osm.server)}.`);
     if (osm && osm.cachedAt) add('info', `OpenStreetMap data saved on this device ${fmtDate(new Date(osm.cachedAt).toISOString())}. <a href="#" id="lnkRefresh">Refresh it</a>.`);
     if (osm){
       const nA = osm.aprons.length, nT = osm.taxi.length, nH = osm.hangars.length;
@@ -732,8 +758,8 @@
     const rf = $('lnkRefresh'); if (rf) rf.addEventListener('click', e => { e.preventDefault(); fetchOsm(true); });
     geoMsg('', '');
     geo = prim ? { runways, prim } : null;
-    $('stepOut').hidden = !geo;
-    if (geo) draw();
+    $('stepOut').hidden = !geo && r.lat == null;
+    draw();
   }
 
   // ---------- airfield box: runway-aligned rectangle around runway + ramp/taxiways, plus margin ----------
@@ -794,11 +820,14 @@
     L.control.layers(baseLayers, null, { collapsed:false, position:'topright' }).addTo(map);
     L.control.scale({ imperial:true, metric:true }).addTo(map);
     map.on('baselayerchange', e => { try { localStorage.setItem(BASE_KEY, e.name); } catch(err){} });
+    map.on('click', onMapClick);
     overlay = L.layerGroup().addTo(map);
     return true;
   }
 
   function draw(){
+    if (!geo){ drawPointOnly(); return; }
+    $('btnShare').disabled = false; $('btnDownload').disabled = false;
     const Ly = layers(), pr = geo.prim, b = brg(pr.a, pr.b);
     if (!ensureMap()){ $('outStatus').className = 'status warn'; $('outStatus').textContent = 'The preview map didn\'t load (no connection to the map library?). The KML can still be sent.'; }
     if (map){
@@ -822,6 +851,42 @@
     }
     $('legend').innerHTML = `<span><i style="background:${Ly.C.rwy}"></i>Runway (${Ly.C.label})</span><span><i style="background:${Ly.C.ramp}"></i>Ramp / taxiways</span>${Ly.box ? `<span><i style="background:${Ly.C.box};opacity:.6"></i>Airfield box (+${Ly.margin} m)</span>` : ''}<span><i style="background:transparent;border:2px solid #3fa7a0;border-radius:50%"></i>AFAC point</span>`;
     sources(Ly);
+  }
+
+  // no runway yet: AFAC's point on the satellite view, KML buttons off, invite tapping the ends
+  function drawPointOnly(){
+    $('btnShare').disabled = true; $('btnDownload').disabled = true;
+    $('legend').innerHTML = '<span><i style="background:transparent;border:2px solid #3fa7a0;border-radius:50%"></i>AFAC point</span>';
+    $('srcList').innerHTML = '<li>No runway yet. When OpenStreetMap answers it will be drawn here; or tap <b>Mark runway ends on the map</b>.</li>';
+    if (!ensureMap() || !rec || rec.lat == null) return;
+    map.invalidateSize(); overlay.clearLayers();
+    L.circleMarker([rec.lat, rec.lon], { radius:6, color:'#3fa7a0', weight:2, fill:false }).bindTooltip(`AFAC reference point ${rec.lat.toFixed(5)}, ${rec.lon.toFixed(5)}`).addTo(overlay);
+    const key = 'pt' + (rec.des || '') + rec.name;
+    if (fitFor !== key){ fitFor = key; map.setView([rec.lat, rec.lon], 15); }
+  }
+
+  // tap two points on the map = the runway ends
+  let picking = 0, pickA = null;
+  function startPicking(){
+    if (!ensureMap()) return;
+    picking = 1; pickA = null;
+    $('outStatus').className = 'status'; $('outStatus').textContent = 'Tap one end of the runway on the map (zoom in on the satellite view first)…';
+    $('map').style.cursor = 'crosshair';
+  }
+  function onMapClick(e){
+    if (!picking) return;
+    const p = [e.latlng.lat, e.latlng.lng];
+    if (picking === 1){
+      pickA = p; picking = 2;
+      L.circleMarker(p, { radius:5, color:'#f5a623', weight:2 }).addTo(overlay);
+      $('outStatus').textContent = 'Now tap the other end of the runway…';
+      return;
+    }
+    picking = 0; $('map').style.cursor = '';
+    $('endA').value = pickA[0].toFixed(6) + ', ' + pickA[1].toFixed(6);
+    $('endB').value = p[0].toFixed(6) + ', ' + p[1].toFixed(6);
+    $('outStatus').textContent = '';
+    $('btnManual').click();
   }
 
   // per-piece source list, shown under the map (and summarized in the KML description)
@@ -925,14 +990,27 @@
 
   // ---------- wiring ----------
   let t = null;
-  $('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(search, 120); });
+  // clearing the box (typing it empty or the ✕) resets everything below
+  function resetAll(){
+    rec = null; osm = null; manualEnds = null; geo = null; picking = 0;
+    $('results').innerHTML = '';
+    ['stepRec', 'stepFF', 'stepGeo', 'stepOut'].forEach(id => $(id).hidden = true);
+    $('checks').innerHTML = ''; $('icaoChecks').innerHTML = ''; geoMsg('', ''); $('outStatus').textContent = '';
+    $('endA').value = ''; $('endB').value = ''; $('manual').open = false;
+    if (overlay) overlay.clearLayers();
+    fitFor = null;
+  }
+  const onQuery = () => { clearTimeout(t); if (!$('q').value.trim()){ resetAll(); return; } t = setTimeout(search, 120); };
+  $('q').addEventListener('input', onQuery);
+  $('q').addEventListener('search', onQuery);
   $('q').addEventListener('keydown', e => { if (e.key === 'Enter'){ const li = $('results').querySelector('li'); if (li) li.click(); } });
   $('btnShare').addEventListener('click', share);
+  $('btnPick').addEventListener('click', startPicking);
   $('btnDownload').addEventListener('click', () => download());
   $('buf').addEventListener('input', () => { save(); if (geo) draw(); });
   $('optBox').addEventListener('change', () => { save(); if (geo) draw(); });
 
-  function save(){ try { localStorage.setItem(KEY, JSON.stringify({ des: rec ? rec.des : '', name: rec ? rec.name : '', buf: $('buf').value, box: $('optBox').checked })); } catch(e){} }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify({ buf: $('buf').value, box: $('optBox').checked })); } catch(e){} }
   function load(){ let s = {}; try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){} if (s.buf) $('buf').value = s.buf; if (s.box === false) $('optBox').checked = false; return s; }
 
   // ---- open counter (App Conventions §6b; Tally, counts silently, never blocks the app) ----

@@ -1,13 +1,16 @@
-// Airfield KML Builder — OpenStreetMap aeroway features near a point, via the Overpass API.
+// Airfield KML Builder — OpenStreetMap aeroway features near a point.
 //
-// Why a server function: public Overpass servers rate-limit by IP and sometimes answer 200 with an error
-// "remark" and no data. Asking from here lets Netlify's CDN cache each airfield's answer for a week, so
-// repeat lookups don't touch Overpass at all. The page falls back to asking Overpass directly if this fails.
+// v0.10 (14-Nov-2026): the OSM main API (api.openstreetmap.org/api/0.6/map) first: one small box per airfield
+// (about 3 × 3 km), filtered here to aeroway features and returned in Overpass "out geom" shape. Overpass
+// servers are the fallback; on 14-Nov-2026 overpass-api.de answered 406 and the mirrors timed out.
+// Netlify's CDN caches each airfield's answer for a week, so each airfield costs OSM one request a week at most.
 // No npm packages (App Conventions §1). Data © OpenStreetMap contributors, ODbL.
 //
 // GET /.netlify/functions/osm?lat=26.25852&lon=-112.49787   (rounded to 5 decimals = the cache key)
 
-const SERVERS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const UA = 'GeezerGeekPilot-AirfieldKML/0.10 (+https://airfield-kml-builder.netlify.app)';
+const AEROWAY = /^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$/;
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 
 const json = (code, obj, cache) => ({
   statusCode: code,
@@ -19,34 +22,59 @@ const json = (code, obj, cache) => ({
   body: JSON.stringify(obj),
 });
 
+async function timed(url, opts, ms) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, Object.assign({ signal: ctl.signal }, opts)); }
+  finally { clearTimeout(t); }
+}
+
+// OSM API map call -> Overpass-like elements with geometry
+async function fromOsmApi(lat, lon, ms) {
+  const dLat = 0.0135, dLon = 0.0135 / Math.cos(lat * Math.PI / 180);   // ≈1.5 km each way
+  const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(v => v.toFixed(5)).join(',');
+  const res = await timed(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${bbox}`, { headers: { 'User-Agent': UA, Accept: 'application/json' } }, ms);
+  if (!res.ok) throw new Error(`api.openstreetmap.org: HTTP ${res.status}`);
+  const d = await res.json();
+  const nodes = new Map(), ways = new Map(), out = [];
+  for (const e of d.elements || []) {
+    if (e.type === 'node') nodes.set(e.id, e);
+    else if (e.type === 'way') ways.set(e.id, e);
+  }
+  const geom = w => w.nodes.map(id => nodes.get(id)).filter(Boolean).map(n => ({ lat: n.lat, lon: n.lon }));
+  for (const e of d.elements || []) {
+    const a = e.tags && e.tags.aeroway;
+    if (!a || !AEROWAY.test(a)) continue;
+    if (e.type === 'node') out.push({ type: 'node', id: e.id, lat: e.lat, lon: e.lon, tags: e.tags });
+    else if (e.type === 'way') out.push({ type: 'way', id: e.id, tags: e.tags, geometry: geom(e) });
+    else if (e.type === 'relation') out.push({ type: 'relation', id: e.id, tags: e.tags,
+      members: (e.members || []).filter(m => m.type === 'way' && ways.has(m.ref)).map(m => ({ type: 'way', ref: m.ref, role: m.role, geometry: geom(ways.get(m.ref)) })) });
+  }
+  return { server: 'api.openstreetmap.org', elements: out };
+}
+
+async function fromOverpass(lat, lon, url, ms) {
+  const query = `[out:json][timeout:20];nwr(around:2500,${lat.toFixed(5)},${lon.toFixed(5)})[aeroway~"^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$"];out geom;`;
+  const res = await timed(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Accept: '*/*', 'User-Agent': UA }, body: 'data=' + encodeURIComponent(query) }, ms);
+  const host = new URL(url).host;
+  if (!res.ok) throw new Error(`${host}: HTTP ${res.status}`);
+  const d = await res.json();
+  if (d.remark && /error|timeout|runtime/i.test(d.remark)) throw new Error(`${host}: ${d.remark.slice(0, 80)}`);
+  return { server: host, elements: d.elements || [] };
+}
+
 exports.handler = async (event) => {
   const q = (event && event.queryStringParameters) || {};
   const lat = Number(q.lat), lon = Number(q.lon);
   if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return json(400, { error: 'lat and lon required' });
-  const query = `[out:json][timeout:20];nwr(around:2500,${lat.toFixed(5)},${lon.toFixed(5)})[aeroway~"^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$"];out geom;`;
-  const errs = [];
-  const started = Date.now();
-  for (const url of SERVERS) {
-    const left = 9000 - (Date.now() - started);          // stay inside Netlify's function time limit
-    if (left < 1500) break;
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), left);
-    try {
-      // overpass-api.de answered 406 to a bare POST from Netlify (14-Nov-2026); send the headers a browser would
-      const res = await fetch(url, {
-        method: 'POST', signal: ctl.signal,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Accept': 'application/json, text/plain, */*',
-                   'User-Agent': 'Mozilla/5.0 (compatible; GeezerGeekPilot-AirfieldKML/0.3; +https://airfield-kml-builder.netlify.app)',
-                   'Referer': 'https://airfield-kml-builder.netlify.app/' },
-        body: 'data=' + encodeURIComponent(query),
-      });
-      if (!res.ok) { errs.push(`${new URL(url).host}: HTTP ${res.status}`); continue; }
-      const d = await res.json();
-      if (d.remark && /error|timeout|runtime/i.test(d.remark)) { errs.push(`${new URL(url).host}: ${d.remark.slice(0, 80)}`); continue; }
-      return json(200, { server: new URL(url).host, fetched: new Date().toISOString(), elements: d.elements || [] }, true);
-    } catch (e) {
-      errs.push(`${new URL(url).host}: ${e.name === 'AbortError' ? 'timed out' : e.message}`);
-    } finally { clearTimeout(timer); }
+  const started = Date.now(), errs = [];
+  const left = () => 9000 - (Date.now() - started);       // stay inside Netlify's function time limit
+  try { return json(200, Object.assign({ fetched: new Date().toISOString() }, await fromOsmApi(lat, lon, Math.min(6000, left()))), true); }
+  catch (e) { errs.push(e.name === 'AbortError' ? 'api.openstreetmap.org: timed out' : e.message); }
+  for (const url of OVERPASS) {
+    if (left() < 1500) break;
+    try { return json(200, Object.assign({ fetched: new Date().toISOString() }, await fromOverpass(lat, lon, url, left())), true); }
+    catch (e) { errs.push(e.name === 'AbortError' ? `${new URL(url).host}: timed out` : e.message); }
   }
   return json(502, { error: errs.join('; ') || 'no answer' });
 };

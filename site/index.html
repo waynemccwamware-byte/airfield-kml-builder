@@ -480,7 +480,7 @@
     for (const [, r] of hits.slice(0, 40)){
       const li = document.createElement('li');
       li.tabIndex = 0; li.setAttribute('role', 'option');
-      const rw = r.rwy.length ? `RWY ${r.rwy.map(pad2).join('/')}` : '';
+      const rw = r.rwy.some(x => /^\d/.test(x)) ? `RWY ${r.rwy.map(pad2).join('/')}` : '';   // AFAC sometimes says NO APLICA
       const dims = r.len_m ? `${r.len_m.toLocaleString()} × ${r.wid_m ?? '?'} m` : '';
       li.innerHTML = `<span class="des">${esc(r.des || '—')}</span>${esc(r.name)}`
         + `<span class="sub">${esc([r.muni, r.state].filter(Boolean).join(', '))} · ${esc([rw, dims, r.surf].filter(Boolean).join(' · '))}${r.status && !/^VIGENTE/.test(r.status) ? ' · ' + esc(tr(r.status)) : ''}</span>`;

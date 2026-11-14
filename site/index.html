@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -211,7 +211,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.2</span>
+    <span class="ver mono">v0.3</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check whether ForeFlight already shows it, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -339,7 +339,8 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const fmtDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? `${m[3]}-${MONTHS[+m[2]-1]}-${m[1]}` : (iso || '—'); };
+  const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const fmtDate = (iso, lg) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? `${m[3]}-${(lg === 'es' ? MESES : MONTHS)[+m[2]-1]}-${m[1]}` : (iso || '—'); };
   const ft = m => Math.round(m / 0.3048);
 
   // ---------- geodesy ----------
@@ -441,7 +442,7 @@
       const rw = r.rwy.length ? `RWY ${r.rwy.map(pad2).join('/')}` : '';
       const dims = r.len_m ? `${r.len_m.toLocaleString()} × ${r.wid_m ?? '?'} m` : '';
       li.innerHTML = `<span class="des">${esc(r.des || '—')}</span>${esc(r.name)}`
-        + `<span class="sub">${esc([r.muni, r.state].filter(Boolean).join(', '))} · ${esc([rw, dims, r.surf].filter(Boolean).join(' · '))}${r.status && r.status !== 'VIGENTE' ? ' · ' + esc(r.status) : ''}</span>`;
+        + `<span class="sub">${esc([r.muni, r.state].filter(Boolean).join(', '))} · ${esc([rw, dims, r.surf].filter(Boolean).join(' · '))}${r.status && !/^VIGENTE/.test(r.status) ? ' · ' + esc(tr(r.status)) : ''}</span>`;
       li.addEventListener('click', () => pick(r));
       li.addEventListener('keydown', e => { if (e.key === 'Enter') pick(r); });
       ul.appendChild(li);
@@ -507,7 +508,7 @@
       [T.surf, esc(tr(r.surf) || '—')],
       [T.ops, esc([tr(r.ops), tr(r.svc)].filter(Boolean).join(' · '))],
       [T.owner, esc(r.owner || '—')],
-      [T.permit, `${esc(tr(r.status) || r.current || '—')}<span class="tag ${cur ? 'ok' : 'warn'}">${cur ? (lang === 'es' ? 'vigente' : 'current') : (lang === 'es' ? 'no vigente' : 'not current')}</span>${r.issued ? ' · ' + T.issued + ' ' + fmtDate(r.issued) : ''}${r.expires ? ' · ' + T.expires + ' ' + fmtDate(r.expires) : ''}`],
+      [T.permit, `${esc(tr(r.status) || r.current || '—')}${cur ? '' : `<span class="tag warn">${lang === 'es' ? 'no vigente' : 'not current'}</span>`}${r.issued ? ' · ' + T.issued + ' ' + fmtDate(r.issued, lang) : ''}${r.expires ? ' · ' + T.expires + ' ' + fmtDate(r.expires, lang) : ''}`],
       [T.coord, esc(r.coord_apt || '—')],
     ];
     $('recTable').innerHTML = rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
@@ -575,7 +576,15 @@
     geoMsg('', 'Looking up OpenStreetMap near AFAC\'s reference point… (can take up to a minute when the servers are busy)');
     const q = `[out:json][timeout:25];nwr(around:2500,${r.lat},${r.lon})[aeroway~"^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$"];out geom;`;
     let data = null, err = '';
-    try { data = await overpass(q); } catch (e){ err = e.message; }
+    // first our own function (Netlify caches each airfield's answer for a week), then Overpass directly
+    try {
+      const c = new AbortController(), timer = setTimeout(() => c.abort(), 15000);
+      const res = await fetch(`/.netlify/functions/osm?lat=${r.lat.toFixed(5)}&lon=${r.lon.toFixed(5)}`, { signal:c.signal });
+      clearTimeout(timer);
+      const d = await res.json();
+      if (res.ok && Array.isArray(d.elements)) data = d; else err = d.error || ('HTTP ' + res.status);
+    } catch (e){ err = 'cache server busy'; }
+    if (!data){ try { data = await overpass(q); } catch (e){ err = e.message; } }
     if (rec !== r) return;     // user picked another airfield meanwhile
     if (!data){
       geoMsg('warn', `OpenStreetMap's data servers didn't answer (${err}). Tap Retry in a minute, or enter the runway ends yourself.`);
@@ -790,7 +799,8 @@
       `<b>Name, reference point, elevation, runway numbers, length, width, surface, permit:</b> ${afac}. It's the same official list <a href="https://airports.robrc.net/?q=${encodeURIComponent(r.des || r.name)}&vigente=&view=map" target="_blank" rel="noopener">airports.robrc.net</a> uses (this app reads it straight from gob.mx, without robrc's corrections).`,
       manualEnds ? `<b>Runway position and direction:</b> the runway ends you entered. Width from AFAC (${r.wid_m ?? 15} m).`
         : `<b>Runway position and direction:</b> OpenStreetMap ${osmWay(pr.id)}${osm.runways.length > 1 ? ` (+${osm.runways.length - 1} more: ${osm.runways.slice(1).map(x => osmWay(x.id)).join(', ')})` : ''}. Width from ${r.wid_m ? 'AFAC' : (pr.width ? 'OpenStreetMap' : 'a 15 m default')} (${Math.round(pr.width)} m).`,
-      Ly.aprons.length || Ly.taxi.length || Ly.hangars.length
+      !osm ? '<b>Ramp, taxiways:</b> not loaded (OpenStreetMap didn\'t answer).'
+        : Ly.aprons.length || Ly.taxi.length || Ly.hangars.length
         ? `<b>Ramp, taxiways, hangars:</b> OpenStreetMap ${[...Ly.aprons, ...Ly.taxi, ...Ly.hangars].map(x => osmWay(x.id)).join(', ')}.`
         : '<b>Ramp, taxiways:</b> none mapped in OpenStreetMap.',
       `<b>Runway end labels:</b> AFAC's runway numbers, each placed at the end it belongs to by the runway's direction (worked out by this app).`,

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -211,7 +211,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.4</span>
+    <span class="ver mono">v0.5</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check whether ForeFlight already shows it, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight as a map layer.</p>
 
@@ -454,9 +454,9 @@
   // ---------- 2. record (English / Español) ----------
   // English shows AFAC's Spanish values translated; Español shows them exactly as AFAC publishes them.
   const LABELS = {
-    en: { loc:'Location', type:'Type', ref:'Reference point', elev:'Elevation', rwy:'Runway', dims:'Length × width', surf:'Surface', ops:'Operations', owner:'Permit holder', permit:'Permit', coord:'Coordinating airport',
+    en: { loc:'Location', type:'Type', ref:'Reference point', elev:'Elevation', rwy:'Runway', dims:'Length × width', surf:'Surface', ops:'Operation (AFAC: TIPO DE OPERACIÓN)', svc:'Service (AFAC: TIPO DE SERVICIO)', owner:'Permit holder', permit:'Permit', coord:'Coordinating airport',
           src:(ed, f) => `AFAC list, ${ed} edition, permit ${f}.`, issued:'issued', expires:'expires', code:'code', none:'not given', datumWarn:'NAD 27 datum: AFAC doesn\'t give this point in WGS-84, and this app doesn\'t convert it, so it may sit some way off the true position.' },
-    es: { loc:'Ubicación', type:'Tipo', ref:'Punto de referencia', elev:'Elevación', rwy:'Pista', dims:'Longitud × ancho', surf:'Superficie', ops:'Operación', owner:'Permisionario', permit:'Permiso', coord:'Aeropuerto de coordinación',
+    es: { loc:'Ubicación', type:'Tipo', ref:'Punto de referencia', elev:'Elevación', rwy:'Pista', dims:'Longitud × ancho', surf:'Superficie', ops:'Tipo de operación', svc:'Tipo de servicio', owner:'Permisionario', permit:'Permiso', coord:'Aeropuerto de coordinación',
           src:(ed, f) => `Listado de la AFAC, edición ${ed}, expediente ${f}.`, issued:'expedido', expires:'vence', code:'clave', none:'sin dato', datumWarn:'Datum NAD 27: la AFAC no da este punto en WGS-84 y esta app no lo convierte, así que puede estar algo desplazado.' },
   };
   // longest phrases first; whole words only
@@ -506,7 +506,8 @@
       [T.rwy, r.rwy.length ? `<span class="mono">${r.rwy.map(pad2).join('/')}</span>` : '—'],
       [T.dims, r.len_m ? `<span class="mono">${r.len_m.toLocaleString()} × ${r.wid_m ?? '?'} m (${ft(r.len_m).toLocaleString()} × ${r.wid_m ? ft(r.wid_m) : '?'} ft)</span>` : '—'],
       [T.surf, esc(tr(r.surf) || '—')],
-      [T.ops, esc([tr(r.ops), tr(r.svc)].filter(Boolean).join(' · '))],
+      [T.ops, esc(tr(r.ops) || '—')],
+      [T.svc, esc(tr(r.svc) || '—')],
       [T.owner, esc(r.owner || '—')],
       [T.permit, `${esc(tr(r.status) || r.current || '—')}${cur ? '' : `<span class="tag warn">${lang === 'es' ? 'no vigente' : 'not current'}</span>`}${r.issued ? ' · ' + T.issued + ' ' + fmtDate(r.issued, lang) : ''}${r.expires ? ' · ' + T.expires + ' ' + fmtDate(r.expires, lang) : ''}`],
       [T.coord, esc(r.coord_apt || '—')],
@@ -826,7 +827,8 @@
       r.rwy.length ? `RWY ${r.rwy.map(pad2).join('/')} · ${r.len_m ? r.len_m.toLocaleString() + ' × ' + (r.wid_m ?? '?') + ' m (' + ft(r.len_m).toLocaleString() + ' × ' + (r.wid_m ? ft(r.wid_m) : '?') + ' ft)' : ''} · ${esc(r.surf || '')} (AFAC)` : '',
       `Mapped length ${len.toLocaleString()} m (${ft(len).toLocaleString()} ft)`,
       r.elev_m != null ? `Elev ${r.elev_m} m / ${ft(r.elev_m).toLocaleString()} ft (AFAC)` : '',
-      [r.ops, r.svc].filter(Boolean).map(esc).join(' · '),
+      r.ops ? `Operation (AFAC): ${esc(r.ops)}` : '',
+      r.svc ? `Service (AFAC): ${esc(r.svc)}` : '',
       `AFAC permit ${esc(r.file || '—')}, ${esc(r.status || '')}${r.expires ? ', expires ' + fmtDate(r.expires) : ''}`,
       '',
       `Sources: AFAC "Aeródromos y helipuertos" list (gob.mx, ${esc(DATA.source.edition || 'current')} edition); ${src}. With thanks to airports.robrc.net.`,

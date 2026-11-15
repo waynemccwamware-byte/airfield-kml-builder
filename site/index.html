@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) v0.39 (15-Nov-2026): added ramp resizes by dragging its corners (Wayne). v0.38 (15-Nov-2026): added ramp has a hover label; its drag handle stays on top and the tie-downs start in its runway-side half (Wayne). v0.37 (15-Nov-2026): X-Plane: when OpenStreetMap has no ramp, an added ramp (size + drag) goes in the apt.dat; tie-downs (start positions) and windsock draggable on the map (Wayne: on the SBY test the aircraft started in the open field). v0.36 (15-Nov-2026): steps 5 and 6 combined: map, then a ForeFlight / Garmin Pilot | X-Plane switch, explanations folded into "How this works"; heading boxes keep focus while typing (Wayne). v0.35 (15-Nov-2026): step 6, X-Plane scenery — apt.dat 1200 + optional library objects in a DSF (site/xplane.js), collapsed by default; Wayne loaded the SQA sample in X-Plane and all looked good. v0.34 (14-Nov-2026): no labeled point in the pack's map layer — tapping it put bare lat/lon in the flight plan (Wayne). v0.33 (14-Nov-2026): ForeFlight content pack switched on (short links install); install steps (More → Custom Content → pack → Install) in the hint; waypoint styled and labeled on the layer so it shows on the map; download/share buttons reduced to two links. v0.32 (14-Nov-2026): ForeFlight pack link is short (pack stored in Netlify Blobs, /pack/<id>/<NAME>.zip) — ForeFlight failed on the ~2,000-character link (Wayne's TSTI test). v0.31 (14-Nov-2026): ForeFlight waypoint named <code>_AFAC (SQA_AFAC) so it can't clash with other packs' X-codes. v0.30 (14-Nov-2026): pack.js sends Content-Length. v0.29 (14-Nov-2026): pack.js responses no longer cached. v0.28 (14-Nov-2026): Open in ForeFlight back to the plain KML link while the content pack is debugged (USE_PACK = false; Wayne). v0.27 (14-Nov-2026): pack zip gets directory entries like ForeFlight's own sample pack (ForeFlight said "Installation Error"). v0.26 (14-Nov-2026): the ForeFlight pack link ends in <name>.zip with the data in the path (ForeFlight showed "pack?n=…" and didn't import). v0.25 (14-Nov-2026): renamed from "Airfield KML Builder" (Wayne); same address. v0.24 (14-Nov-2026): separate ForeFlight and Garmin Pilot buttons; ForeFlight gets a content pack (pack.js: layers/ map layer + navdata/ user waypoint X<code> at AFAC's point with AFAC elevation and the AFAC record attached) via foreflight.com/content?downloadURL=; Download ForeFlight pack (.zip). v0.23 (14-Nov-2026): text search also matches OurAirports names/keywords (oa.js ?q=) and lists the AFAC aerodrome. v0.22 (14-Nov-2026): OurAirports identifiers (MX-0007) find the AFAC aerodrome (oa.js); designator cells with notes match on their code. v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) v0.40 (15-Nov-2026): X-Plane layout (objects, ramp, tie-downs, windsock, ID, options) saved on the device per airfield, with Start over (Wayne). v0.39 (15-Nov-2026): added ramp resizes by dragging its corners (Wayne). v0.38 (15-Nov-2026): added ramp has a hover label; its drag handle stays on top and the tie-downs start in its runway-side half (Wayne). v0.37 (15-Nov-2026): X-Plane: when OpenStreetMap has no ramp, an added ramp (size + drag) goes in the apt.dat; tie-downs (start positions) and windsock draggable on the map (Wayne: on the SBY test the aircraft started in the open field). v0.36 (15-Nov-2026): steps 5 and 6 combined: map, then a ForeFlight / Garmin Pilot | X-Plane switch, explanations folded into "How this works"; heading boxes keep focus while typing (Wayne). v0.35 (15-Nov-2026): step 6, X-Plane scenery — apt.dat 1200 + optional library objects in a DSF (site/xplane.js), collapsed by default; Wayne loaded the SQA sample in X-Plane and all looked good. v0.34 (14-Nov-2026): no labeled point in the pack's map layer — tapping it put bare lat/lon in the flight plan (Wayne). v0.33 (14-Nov-2026): ForeFlight content pack switched on (short links install); install steps (More → Custom Content → pack → Install) in the hint; waypoint styled and labeled on the layer so it shows on the map; download/share buttons reduced to two links. v0.32 (14-Nov-2026): ForeFlight pack link is short (pack stored in Netlify Blobs, /pack/<id>/<NAME>.zip) — ForeFlight failed on the ~2,000-character link (Wayne's TSTI test). v0.31 (14-Nov-2026): ForeFlight waypoint named <code>_AFAC (SQA_AFAC) so it can't clash with other packs' X-codes. v0.30 (14-Nov-2026): pack.js sends Content-Length. v0.29 (14-Nov-2026): pack.js responses no longer cached. v0.28 (14-Nov-2026): Open in ForeFlight back to the plain KML link while the content pack is debugged (USE_PACK = false; Wayne). v0.27 (14-Nov-2026): pack zip gets directory entries like ForeFlight's own sample pack (ForeFlight said "Installation Error"). v0.26 (14-Nov-2026): the ForeFlight pack link ends in <name>.zip with the data in the path (ForeFlight showed "pack?n=…" and didn't import). v0.25 (14-Nov-2026): renamed from "Airfield KML Builder" (Wayne); same address. v0.24 (14-Nov-2026): separate ForeFlight and Garmin Pilot buttons; ForeFlight gets a content pack (pack.js: layers/ map layer + navdata/ user waypoint X<code> at AFAC's point with AFAC elevation and the AFAC record attached) via foreflight.com/content?downloadURL=; Download ForeFlight pack (.zip). v0.23 (14-Nov-2026): text search also matches OurAirports names/keywords (oa.js ?q=) and lists the AFAC aerodrome. v0.22 (14-Nov-2026): OurAirports identifiers (MX-0007) find the AFAC aerodrome (oa.js); designator cells with notes match on their code. v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -249,7 +249,7 @@
 
   <div class="title-row">
     <h1>Mexican Airstrips for your EFB and Sim</h1>
-    <span class="ver mono">v0.39</span>
+    <span class="ver mono">v0.40</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and draw its runway, ramp and taxiways from AFAC and OpenStreetMap data, and send it to ForeFlight (map layer plus a user waypoint you can put in a route) or Garmin Pilot (map layer).</p>
 
@@ -364,6 +364,7 @@
           <button class="btn" id="xpAdd" type="button">Add to the ramp</button>
         </div>
           <ul class="xp-list" id="xpList"></ul>
+          <p class="hint" id="xpSaved" hidden></p>
           <div class="actions"><button class="btn primary" id="xpDl" type="button">Download X-Plane scenery (.zip)</button></div>
           <div class="status" id="xpStatus" role="status" aria-live="polite"></div>
           <details class="manual">
@@ -1361,6 +1362,38 @@
   let xpObjs = [], xpLayer = null, xpFor = null, xpSeq = 0;
   // v0.37: positions the pilot dragged (null / missing = the app's default)
   let xpRampC = null, xpTieOv = {}, xpSockOv = null;
+  // v0.40: the X-Plane layout (objects, ramp, tie-downs, windsock, ID, options) is kept on this device per airfield,
+  // so it's there when the pilot comes back to adjust it (Wayne: this is done iteratively)
+  const xpKey = () => 'airfieldKml.xp.' + (rec.des || '') + '|' + rec.name;
+  function xpSave(){
+    if (!rec) return;
+    const st = { v:1, at:Date.now(), id:$('xpId').value, sock:$('xpSock').checked, ties:$('xpTies').value,
+      rampOn:$('xpRampOn').checked, rampW:$('xpRampW').value, rampD:$('xpRampD').value, rampC:xpRampC, tieOv:xpTieOv, sockOv:xpSockOv,
+      objs:xpObjs.map(o => ({ id:o.id, lat:o.lat, lon:o.lon, hdg:o.hdg })) };
+    try { localStorage.setItem(xpKey(), JSON.stringify(st)); } catch(e){}
+    xpSavedNote(st.at);
+  }
+  function xpLoad(){
+    let st = null; try { st = JSON.parse(localStorage.getItem(xpKey()) || 'null'); } catch(e){}
+    if (!st || st.v !== 1) return false;
+    $('xpId').value = st.id || xpDefaultId(); $('xpSock').checked = st.sock !== false; $('xpTies').value = st.ties ?? '2';
+    $('xpRampOn').checked = st.rampOn !== false; $('xpRampW').value = st.rampW || '50'; $('xpRampD').value = st.rampD || '35';
+    xpRampC = st.rampC || null; xpTieOv = st.tieOv || {}; xpSockOv = st.sockOv || null;
+    xpObjs = (st.objs || []).filter(o => XP.BY_ID[o.id]).map(o => ({ ...o, k: ++xpSeq }));
+    xpSavedNote(st.at);
+    return true;
+  }
+  function xpSavedNote(at){
+    const d = new Date(at), iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    $('xpSaved').innerHTML = `Your layout for this airfield is saved on this device (last change ${fmtDate(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}). <button class="linkbtn" id="xpReset" type="button">Start over</button>`;
+    $('xpSaved').hidden = false;
+  }
+  function xpDefaults(){
+    xpObjs = []; xpRampC = null; xpTieOv = {}; xpSockOv = null;
+    $('xpId').value = xpDefaultId(); $('xpSock').checked = true; $('xpTies').value = '2';
+    $('xpRampOn').checked = true; $('xpRampW').value = '50'; $('xpRampD').value = '35';
+    $('xpSaved').hidden = true;
+  }
   const xpNum = (id, lo, hi, d) => { const v = parseFloat($(id).value); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
   const titleEs = s => String(s || '').toLowerCase().replace(/(^|[\s(-])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
     .split(' ').map((w, i) => i && /^(De|Del|La|Las|Los|El|Y)$/.test(w) ? w.toLowerCase() : w).join(' ');
@@ -1422,7 +1455,7 @@
   function xpRefresh(){
     if (!geo || !rec) return;
     const key = (rec.des || '') + rec.name;
-    if (xpFor !== key){ xpFor = key; xpObjs = []; xpRampC = null; xpTieOv = {}; xpSockOv = null; $('xpId').value = xpDefaultId(); }
+    if (xpFor !== key){ xpFor = key; xpDefaults(); xpLoad(); }
     $('xpRampRow').hidden = layers().aprons.length > 0;
     if (!$('xpPick').options.length) $('xpPick').innerHTML = XP.CATALOG.map(g => `<optgroup label="${esc(g.group)}">${g.items.map(i => `<option value="${i.id}">${esc(i.label)}</option>`).join('')}</optgroup>`).join('');
     xpRender();
@@ -1443,7 +1476,7 @@
     if (!xpLayer) xpLayer = L.layerGroup().addTo(map);
     xpLayer.clearLayers();
     let g = null; try { g = xpGeom(); } catch (e){}
-    const drag = (ll, cls, size, tip, done, z) => { const m = L.marker(ll, { draggable:true, autoPan:true, zIndexOffset:z || 0, title:tip, icon:L.divIcon({ className:cls, iconSize:[size, size], iconAnchor:[size / 2, size / 2] }) }).addTo(xpLayer); m.bindTooltip(tip); m.on('dragend', () => { const p = m.getLatLng(); done([p.lat, p.lng]); xpDraw(); }); return m; };
+    const drag = (ll, cls, size, tip, done, z) => { const m = L.marker(ll, { draggable:true, autoPan:true, zIndexOffset:z || 0, title:tip, icon:L.divIcon({ className:cls, iconSize:[size, size], iconAnchor:[size / 2, size / 2] }) }).addTo(xpLayer); m.bindTooltip(tip); m.on('dragend', () => { const p = m.getLatLng(); done([p.lat, p.lng]); xpDraw(); xpSave(); }); return m; };
     if (g && g.rampPoly){
       const rp = L.polygon(g.rampPoly, { color:'#f5a623', weight:1.5, dashArray:'5 4', fillColor:(layers().C || {}).ramp || '#6b6b77', fillOpacity:.55 })
         .bindTooltip(`Added ramp for X-Plane, ${g.RW} × ${g.RD} m (OpenStreetMap has none here). Drag the dashed square in its middle to move it, or a corner to resize it.`, { sticky:true }).addTo(xpLayer);
@@ -1459,7 +1492,7 @@
         const cm = L.marker(pt, { draggable:true, autoPan:true, zIndexOffset:900, title:'Drag to resize the ramp', icon:L.divIcon({ className:'xp-corner', iconSize:[10, 10], iconAnchor:[5, 5] }) }).addTo(xpLayer);
         cm.bindTooltip('Ramp corner: drag to resize');
         cm.on('drag', () => { const ll = cm.getLatLng(), f = fit(i, [ll.lat, ll.lng]); rp.setLatLngs(f.poly); });
-        cm.on('dragend', () => { const ll = cm.getLatLng(), f = fit(i, [ll.lat, ll.lng]); xpRampC = f.ctr; $('xpRampW').value = f.W; $('xpRampD').value = f.D; xpDraw(); });
+        cm.on('dragend', () => { const ll = cm.getLatLng(), f = fit(i, [ll.lat, ll.lng]); xpRampC = f.ctr; $('xpRampW').value = f.W; $('xpRampD').value = f.D; xpDraw(); xpSave(); });
       });
     }
     if (g && $('xpSock').checked) drag(g.sock, 'xp-sock', 12, 'Windsock (X-Plane)', p => { xpSockOv = p; });
@@ -1469,7 +1502,7 @@
       L.polygon(xpFoot(o), { color:'#f5a623', weight:1.5, fillColor:'#f5a623', fillOpacity:.25, interactive:false }).addTo(xpLayer);
       const m = L.marker([o.lat, o.lon], { draggable:true, autoPan:true, title:XP.BY_ID[o.id].label, icon:L.divIcon({ className:'xp-obj', iconSize:[14, 14], iconAnchor:[7, 7] }) }).addTo(xpLayer);
       m.bindTooltip(XP.BY_ID[o.id].label);
-      m.on('dragend', () => { const ll = m.getLatLng(); o.lat = ll.lat; o.lon = ll.lng; xpRender(); });
+      m.on('dragend', () => { const ll = m.getLatLng(); o.lat = ll.lat; o.lon = ll.lng; xpRender(); xpSave(); });
     });
   }
   $('xpAdd').addEventListener('click', () => {
@@ -1478,11 +1511,17 @@
     // a row along the far side of the ramp, back from the runway
     const p = dest(dest(g.spot, g.h + g.side, g.back), g.h, (n % 5 - 2) * (g.rampC ? 12 : 30));
     xpObjs.push({ k: ++xpSeq, id: $('xpPick').value, lat: p[0], lon: p[1], hdg: g.face });
-    xpRender();
+    xpRender(); xpSave();
   });
-  $('xpList').addEventListener('input', e => { const li = e.target.closest('li[data-k]'); if (!li || e.target.tagName !== 'INPUT') return; const o = xpObjs.find(x => x.k == li.dataset.k); const v = parseFloat(e.target.value); if (o && isFinite(v)){ o.hdg = ((v % 360) + 360) % 360; xpDraw(); } });
-  $('xpList').addEventListener('click', e => { const li = e.target.closest('li[data-k]'); if (!li || e.target.tagName !== 'BUTTON') return; xpObjs = xpObjs.filter(x => x.k != li.dataset.k); xpRender(); });
-  ['xpSock', 'xpTies', 'xpRampOn', 'xpRampW', 'xpRampD'].forEach(id => $(id).addEventListener('input', () => xpDraw()));
+  $('xpList').addEventListener('input', e => { const li = e.target.closest('li[data-k]'); if (!li || e.target.tagName !== 'INPUT') return; const o = xpObjs.find(x => x.k == li.dataset.k); const v = parseFloat(e.target.value); if (o && isFinite(v)){ o.hdg = ((v % 360) + 360) % 360; xpDraw(); xpSave(); } });
+  $('xpList').addEventListener('click', e => { const li = e.target.closest('li[data-k]'); if (!li || e.target.tagName !== 'BUTTON') return; xpObjs = xpObjs.filter(x => x.k != li.dataset.k); xpRender(); xpSave(); });
+  ['xpSock', 'xpTies', 'xpRampOn', 'xpRampW', 'xpRampD'].forEach(id => $(id).addEventListener('input', () => { xpDraw(); xpSave(); }));
+  $('xpId').addEventListener('input', () => xpSave());
+  $('xpSaved').addEventListener('click', e => {
+    if (e.target.id !== 'xpReset') return;
+    try { localStorage.removeItem(xpKey()); } catch(err){}
+    xpDefaults(); xpRender();
+  });
   // ForeFlight / Garmin Pilot | X-Plane switch under the map
   document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.seg button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', String(on)); $(x.dataset.pane).hidden = !on; });

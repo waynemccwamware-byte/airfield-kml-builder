@@ -33,7 +33,11 @@ the zip, (2) share links, (3) reopen our own zips, (4) apt.dat import from other
 - "Share layout link": ?xp=z<base64url(deflate-raw JSON)> (~330–400 chars); opening it loads the airfield + layout.
 - Runway ends the pilot placed now persist per airfield (airfieldKml.ends.<des>|<name>).
 - Replacing a different saved layout asks first (confirm).
-Later / parked (Wayne: less important): pull an existing airport from the Scenery Gateway or a WED project.
+- v0.53: Import from Gateway (netlify/functions/gateway.js; API endpoints per Laminar's xplane_airports gateway.py,
+  checked live 15-Nov-2026: /apiv1/airports ≈20 MB, /apiv1/airport/<ID>, /apiv1/scenery/<id> with masterZipBlob =
+  <ID>.dat + <ID>.txt (DSF text) + <ID>_Scenery_Pack.zip). No CORS on the API, hence the function.
+  Lossy by design: only the largest pavement (as a rectangle), runway, windsock, starts, and catalog objects come in.
+- Later: WED project import; more catalog objects (Gateway packs use many library paths the app doesn't offer).
 
 ## X-Plane airport export — LIVE in v0.35 (15-Nov-2026)
 - X-Plane pane under the step 5 map (v0.36; was a separate step 6 in v0.35): site/xplane.js writes apt.dat 1200 (runway from AFAC numbers/width/surface, ramp + taxiway

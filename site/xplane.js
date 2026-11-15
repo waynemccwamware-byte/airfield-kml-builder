@@ -381,6 +381,21 @@
     return out;
   }
 
+  // ---------- DSF as text (DSFTool / Scenery Gateway <CODE>.txt) → placed objects (v0.53) ----------
+  // Field order per DSFTool's DSF2Text.cpp: OBJECT <def> <lon> <lat> <heading>;
+  // OBJECT_AGL|OBJECT_MSL <def> <lon> <lat> <height> <heading>. OBJECT_DEF lines number the definitions from 0.
+  function parseDsfText(text){
+    const defs = [], raw = [];
+    for (const line of text.split(/\r?\n/)){
+      const t = line.trim().split(/\s+/);
+      if (t[0] === 'OBJECT_DEF') defs.push(t.slice(1).join(' '));
+      else if (t[0] === 'OBJECT') raw.push([+t[1], +t[2], +t[3], +t[4]]);
+      else if (t[0] === 'OBJECT_AGL' || t[0] === 'OBJECT_MSL') raw.push([+t[1], +t[2], +t[3], +t[5]]);
+    }
+    return raw.filter(r => defs[r[0]] != null && isFinite(r[1]) && isFinite(r[2]))
+      .map(([d, lon, lat, hdg]) => ({ path: defs[d], lat, lon, hdg: isFinite(hdg) ? ((hdg % 360) + 360) % 360 : 0 }));
+  }
+
   // ---------- read a scenery pack: zip or loose files → { layout } (our own file) or { apt, objs } ----------
   async function readScenery(files){
     const items = [];
@@ -392,19 +407,23 @@
     const txt = async it => new TextDecoder().decode(await it.get());
     const lay = items.find(it => it.name.split('/').pop() === LAYOUT_FILE || /\.json$/i.test(it.name));
     if (lay){ try { const L = JSON.parse(await txt(lay)); if (L && L.app === 'mx-airstrips') return { layout: L }; } catch (e){} }
-    const aptIt = items.find(it => /(^|\/)apt\.dat$/i.test(it.name));
+    const aptIt = items.find(it => /(^|\/)apt\.dat$/i.test(it.name)) || items.find(it => /\.dat$/i.test(it.name));   // Gateway: <CODE>.dat
     if (!aptIt) throw new Error('no apt.dat or layout file found in what you chose');
     const apt = parseAptDat(await txt(aptIt));
     const objs = [], unknown = new Set(), errors = [];
+    const place = list => list.forEach(o => { const c = BY_PATH[o.path]; if (c) objs.push({ id: c.id, lat: o.lat, lon: o.lon, hdg: o.hdg }); else unknown.add(o.path); });
+    for (const it of items.filter(it => /\.txt$/i.test(it.name) && !/readme|copying/i.test(it.name))){
+      try { const t = await txt(it); if (/^\s*OBJECT_DEF\b/m.test(t) || /^PROPERTY sim\//m.test(t)) place(parseDsfText(t)); } catch (e){ errors.push(it.name.split('/').pop() + ': ' + e.message); }
+    }
     for (const it of items.filter(it => /\.dsf$/i.test(it.name))){
-      try { parseDsf(await it.get()).forEach(o => { const c = BY_PATH[o.path]; if (c) objs.push({ id: c.id, lat: o.lat, lon: o.lon, hdg: o.hdg }); else unknown.add(o.path); }); }
+      try { place(parseDsf(await it.get())); }
       catch (e){ errors.push(it.name.split('/').pop() + ': ' + e.message); }
     }
     return { apt, objs, unknown: [...unknown], errors };
   }
   const BY_PATH = {}; CATALOG.forEach(g => g.items.forEach(i => { BY_PATH[i.path] = i; }));
 
-  const api = { CATALOG, BY_ID, BY_PATH, LAYOUT_FILE, aptDat, dsf, md5, zip, pack, ccw, ribbon, dest, brg, dist, unzip, parseAptDat, parseDsf, readScenery };
+  const api = { CATALOG, BY_ID, BY_PATH, LAYOUT_FILE, aptDat, dsf, md5, zip, pack, ccw, ribbon, dest, brg, dist, unzip, parseAptDat, parseDsf, parseDsfText, readScenery };
   if (typeof window !== 'undefined') window.XP = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();

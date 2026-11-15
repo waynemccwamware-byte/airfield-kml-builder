@@ -1,4 +1,4 @@
-// Airfield KML Builder — serve a ForeFlight content pack (.zip) the page built, from a real URL (v0.24).
+// Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) — serve a ForeFlight content pack (.zip) the page built, from a real URL (v0.24).
 //
 // Why: a KML with shapes always imports as a User Map Layer, so its points can't be used in a route.
 // A content pack carries the shapes in layers/ and a points-only waypoint KML in navdata/, so one import

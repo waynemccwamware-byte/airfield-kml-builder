@@ -1,4 +1,4 @@
-// Airfield KML Builder — OpenStreetMap aeroway features near a point.
+// Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) — OpenStreetMap aeroway features near a point.
 //
 // v0.10 (14-Nov-2026): the OSM main API (api.openstreetmap.org/api/0.6/map) first: one small box per airfield
 // (about 3 × 3 km), filtered here to aeroway features and returned in Overpass "out geom" shape. Overpass

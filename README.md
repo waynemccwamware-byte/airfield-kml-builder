@@ -1,4 +1,6 @@
-# Airfield KML Builder (GeezerGeek Pilot)
+# Mexican Airstrips for your EFB and Sim (GeezerGeek Pilot)
+
+Formerly "Airfield KML Builder" (renamed 14-Nov-2026; the web address and repo name are unchanged).
 
 Finds a Mexican airfield in AFAC's official list of aerodromes, and builds a KML of its runway, ramp and
 taxiways for ForeFlight (User Map Layers). Not for navigation.

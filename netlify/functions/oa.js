@@ -1,4 +1,4 @@
-// Airfield KML Builder — look up an OurAirports identifier (e.g. MX-0007) for a Mexican airfield.
+// Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) — look up an OurAirports identifier (e.g. MX-0007) for a Mexican airfield.
 //
 // OurAirports gives Mexican strips without an official code identifiers like "MX-0007", and robrc.net and other
 // sites show them. This function finds one and returns its local code (often AFAC's 3-letter designator,

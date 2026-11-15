@@ -1,4 +1,4 @@
-// Airfield KML Builder — AFAC aerodromes & heliports list as JSON.
+// Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) — AFAC aerodromes & heliports list as JSON.
 //
 // Source: AFAC (Agencia Federal de Aviación Civil, Mexico) public spreadsheet "Aeródromos y helipuertos",
 // published on gob.mx. The same file airports.robrc.net uses as its principal source (credit to robrc.net

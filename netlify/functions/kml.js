@@ -1,4 +1,4 @@
-// Airfield KML Builder — serve a KML the page built, from a real URL, so iOS offers "Open in ForeFlight".
+// Mexican Airstrips for your EFB and Sim (formerly Airfield KML Builder) — serve a KML the page built, from a real URL, so iOS offers "Open in ForeFlight".
 //
 // Why: the Web Share API hands iOS the file with a MIME type it may not map to ForeFlight's KML type, so
 // ForeFlight can be missing from the share sheet (Wayne, 14-Nov-2026). ForeFlight documents importing KML

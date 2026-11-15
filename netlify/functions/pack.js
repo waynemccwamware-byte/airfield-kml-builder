@@ -11,6 +11,32 @@
 // (older form, still accepted: /.netlify/functions/pack?n=<pack name>&d=<…>)
 
 const zlib = require('zlib');
+const crypto = require('crypto');
+
+// ---------- v0.32: short links ----------
+// ForeFlight installs a pack from a short address but not from the ~2,000-character one that carried the whole pack
+// (Wayne's tests, 14-Nov-2026: the same zip installed from /fftest/TSTG.zip and failed from /fftest/long/…/TSTI.zip).
+// So the page POSTs the pack once; it's kept in Netlify Blobs (store "packs") under a 16-hex id from its SHA-256,
+// and ForeFlight gets /.netlify/functions/pack/<id>/<NAME>.zip. Blobs over its REST interface, the way
+// @netlify/blobs connectLambda() does it (event.blobs = base64 JSON {url, token}; site id in x-nf-site-id) — no npm.
+function blobsEnv(event){
+  if (!event.blobs) throw new Error('Netlify Blobs not available to this function');
+  const { url, token } = JSON.parse(Buffer.from(event.blobs, 'base64').toString('utf8'));
+  const site = (event.headers || {})['x-nf-site-id'];
+  if (!url || !token || !site) throw new Error('Netlify Blobs context incomplete');
+  return { url, token, site };
+}
+const blobUrl = (env, key) => new URL(`/${env.site}/site:packs/${key}`, env.url).toString();
+async function blobPut(env, key, text){
+  const r = await fetch(blobUrl(env, key), { method: 'PUT', headers: { authorization: `Bearer ${env.token}` }, body: text });
+  if (!r.ok) throw new Error('store failed: HTTP ' + r.status);
+}
+async function blobGet(env, key){
+  const r = await fetch(blobUrl(env, key), { headers: { authorization: `Bearer ${env.token}` } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('read failed: HTTP ' + r.status);
+  return r.text();
+}
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -52,9 +78,33 @@ function zip(files){
 
 exports.handler = async (event) => {
   const q = Object.assign({}, (event && event.queryStringParameters) || {});
+  // POST body = the base64url payload → { id }
+  if (event && event.httpMethod === 'POST'){
+    try {
+      const d = String(event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '')).trim();
+      if (!/^[A-Za-z0-9_-]{20,60000}$/.test(d)) throw new Error('bad payload');
+      JSON.parse(zlib.inflateRawSync(Buffer.from(d.replace(/-/g, '+').replace(/_/g, '/'), 'base64'), { maxOutputLength: 3_000_000 }).toString('utf8'));
+      const id = crypto.createHash('sha256').update(d).digest('hex').slice(0, 16);
+      const env = blobsEnv(event);
+      await blobPut(env, id, d);
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ id }) };
+    } catch (e) {
+      return { statusCode: 400, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: String(e.message || e) }) };
+    }
+  }
+  const short = /\/pack\/([0-9a-f]{16})\/([A-Za-z0-9_-]+)\.zip$/.exec((event && event.path) || '');
+  if (short){
+    try {
+      const d = await blobGet(blobsEnv(event), short[1]);
+      if (!d) return { statusCode: 404, headers: { 'Content-Type': 'text/plain' }, body: 'No such pack (links last as long as the server keeps them; build it again in the app).' };
+      q.d = d; q.n = short[2];
+    } catch (e) {
+      return { statusCode: 502, headers: { 'Content-Type': 'text/plain' }, body: 'Could not read the pack: ' + e.message };
+    }
+  }
   // v0.26: path form /.netlify/functions/pack/<d in 200-char segments>/<NAME>.zip — ForeFlight takes the text after
   // the last "/" as the file name and only imports it as a content pack when that ends in .zip (Wayne, iOS, 14-Nov-2026)
-  const m = /\/pack\/(.+)\/([A-Za-z0-9_-]+)\.zip$/.exec((event && (event.rawUrl ? new URL(event.rawUrl).pathname : event.path)) || '');
+  const m = short ? null : /\/pack\/(.+)\/([A-Za-z0-9_-]+)\.zip$/.exec((event && (event.rawUrl ? new URL(event.rawUrl).pathname : event.path)) || '');
   if (m){ q.d = m[1].replace(/\//g, ''); q.n = m[2]; }
   try {
     if (!q.d || q.d.length > 60000) throw new Error('missing or too large');

@@ -37,6 +37,7 @@ the zip, (2) share links, (3) reopen our own zips, (4) apt.dat import from other
   checked live 15-Nov-2026: /apiv1/airports ≈20 MB, /apiv1/airport/<ID>, /apiv1/scenery/<id> with masterZipBlob =
   <ID>.dat + <ID>.txt (DSF text) + <ID>_Scenery_Pack.zip). No CORS on the API, hence the function.
   Lossy by design: only the largest pavement (as a rectangle), runway, windsock, starts, and catalog objects come in.
+- Later (Wayne passed for now, 15-Nov-2026): exclusion-zone rectangle on the map → DSF PROPERTY sim/exclude_obj|fac|for|net… west/south/east/north (same 1° tile), e.g. for XMM000K's wind turbines (removed IRL).
 - Later: WED project import; more catalog objects (Gateway packs use many library paths the app doesn't offer).
 
 ## X-Plane airport export — LIVE in v0.35 (15-Nov-2026)

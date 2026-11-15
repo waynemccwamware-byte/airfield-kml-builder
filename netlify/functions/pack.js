@@ -76,7 +76,9 @@ exports.handler = async (event) => {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${name}.zip"`,
-        'Cache-Control': 'public, max-age=86400',
+        // v0.29: never cached — the CDN served an older build of the same pack URL during testing (14-Nov-2026)
+        'Cache-Control': 'no-store',
+        'Netlify-CDN-Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },
       body: zip(files).toString('base64'),

@@ -20,19 +20,26 @@ const CRC_TABLE = (() => {
 const crc32 = (buf) => { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
 
 function zip(files){
+  // directory entries first ("XSQA/", "XSQA/layers/" …), as Finder's "Compress" writes them and as ForeFlight's own
+  // sample content pack has them (v0.27)
+  const dirs = new Set();
+  for (const [path] of files){ const parts = path.split('/'); for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/') + '/'); }
+  files = [...[...dirs].sort().map(d => [d, null]), ...files];
   const locals = [], centrals = []; let offset = 0;
   const d = new Date(), dosTime = (d.getUTCHours() << 11) | (d.getUTCMinutes() << 5) | (d.getUTCSeconds() >> 1),
         dosDate = ((d.getUTCFullYear() - 1980) << 9) | ((d.getUTCMonth() + 1) << 5) | d.getUTCDate();
   for (const [path, text] of files){
-    const name = Buffer.from(path, 'utf8'), raw = Buffer.from(text, 'utf8'), comp = zlib.deflateRawSync(raw), crc = crc32(raw);
+    const isDir = text === null;
+    const name = Buffer.from(path, 'utf8'), raw = Buffer.from(isDir ? '' : text, 'utf8'), comp = isDir ? raw : zlib.deflateRawSync(raw), crc = crc32(raw), method = isDir ? 0 : 8;
     const lh = Buffer.alloc(30);
-    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x0800, 6); lh.writeUInt16LE(8, 8);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6); lh.writeUInt16LE(method, 8);
     lh.writeUInt16LE(dosTime, 10); lh.writeUInt16LE(dosDate, 12); lh.writeUInt32LE(crc, 14);
     lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(name.length, 26); lh.writeUInt16LE(0, 28);
     const ch = Buffer.alloc(46);
-    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0x0800, 8); ch.writeUInt16LE(8, 10);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0, 8); ch.writeUInt16LE(method, 10);
     ch.writeUInt16LE(dosTime, 12); ch.writeUInt16LE(dosDate, 14); ch.writeUInt32LE(crc, 16);
     ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(raw.length, 24); ch.writeUInt16LE(name.length, 28);
+    ch.writeUInt32LE(isDir ? 0x10 : 0, 38);   // MS-DOS directory attribute
     ch.writeUInt32LE(offset, 42);
     locals.push(lh, name, comp); centrals.push(ch, name);
     offset += 30 + name.length + comp.length;
@@ -57,7 +64,8 @@ exports.handler = async (event) => {
     const files = [];
     for (const [path, text] of Object.entries(obj)){
       // only what a content pack holds: manifest.json, layers/*.kml, navdata/*.kml|*.txt — all under <name>/
-      if (!new RegExp(`^${name}/(manifest\\.json|layers/[^/]+\\.kml|navdata/[^/]+\\.(kml|txt))$`).test(path)) throw new Error('unexpected file ' + path);
+      // with or without the pack folder on top (ForeFlight's own packs come both ways)
+      if (!new RegExp(`^(${name}/)?(manifest\\.json|layers/[^/]+\\.kml|navdata/[^/]+\\.(kml|txt))$`).test(path)) throw new Error('unexpected file ' + path);
       if (typeof text !== 'string') throw new Error('bad file ' + path);
       if (/\.kml$/.test(path) && !/^<\?xml[\s\S]*<kml[\s>]/.test(text)) throw new Error('not a KML document: ' + path);
       files.push([path, text]);

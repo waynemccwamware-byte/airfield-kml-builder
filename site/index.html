@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Airfield KML Builder v0.23 (14-Nov-2026): text search also matches OurAirports names/keywords (oa.js ?q=) and lists the AFAC aerodrome. v0.22 (14-Nov-2026): OurAirports identifiers (MX-0007) find the AFAC aerodrome (oa.js); designator cells with notes match on their code. v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
+<!-- Airfield KML Builder v0.24 (14-Nov-2026): separate ForeFlight and Garmin Pilot buttons; ForeFlight gets a content pack (pack.js: layers/ map layer + navdata/ user waypoint X<code> at AFAC's point with AFAC elevation and the AFAC record attached) via foreflight.com/content?downloadURL=; Download ForeFlight pack (.zip). v0.23 (14-Nov-2026): text search also matches OurAirports names/keywords (oa.js ?q=) and lists the AFAC aerodrome. v0.22 (14-Nov-2026): OurAirports identifiers (MX-0007) find the AFAC aerodrome (oa.js); designator cells with notes match on their code. v0.21 (14-Nov-2026): button "Open in ForeFlight / Garmin Pilot"; Garmin Pilot steps in the hint (untested). v0.20 (14-Nov-2026): typing an ICAO code (MMLT) or its IATA code says it's an ICAO airport. v0.19 (14-Nov-2026): search accepts X-prefixed designators (XFTE = FTE). v0.18 (14-Nov-2026): starter runway from AFAC figures + WMM-2025 variation when OSM has none; draggable runway ends; variation check uses WMM-2025. v0.17 (14-Nov-2026): zoom-to-airfield button under the map's + / −. v0.16 (14-Nov-2026): no-runway wording points to Mark runway ends. v0.15 (14-Nov-2026): "Open in ForeFlight" is greyed out until there's a runway (it looked live and did nothing). v0.14 (14-Nov-2026): source list named the main runway twice when OSM had two runways. v0.13 (14-Nov-2026): "Open in ForeFlight" serves the KML from a link (kml.js) because the iOS share sheet didn't list ForeFlight. v0.12 (14-Nov-2026): steps 2–4 collapsible, collapsed by default with a one-line summary; open themselves on a warning; Data and thanks collapsible, open. v0.11 (14-Nov-2026): hint under "Mark runway ends on the map" saying when to use it. v0.10 (14-Nov-2026): OpenStreetMap via its main API (Overpass failing); map shows as soon as an airfield is picked; tap runway ends on the map; search starts empty and clearing it resets the page. v0.9 (14-Nov-2026): ICAO check tells "looks like" (shared code within 25 km, or within 300 m) from "nearby" (within 3 km). v0.8 (14-Nov-2026): step 3 is now an ICAO check (official SAM list + OurAirports ICAO codes, bundled in site/data/mx-icao.json) in place of the ForeFlight-via-Claude button (Wayne). v0.7 (14-Nov-2026): Control Panel icon for the browser tab and Home Screen. v0.6 (14-Nov-2026): airports.robrc.net credited in step 1 too (Wayne). v0.5 (14-Nov-2026): AFAC's TIPO DE OPERACIÓN and TIPO DE SERVICIO shown as two separate rows (were joined under one label). v0.4 (14-Nov-2026): airfield box margin default 50 m (Wayne). v0.3 (14-Nov-2026): OpenStreetMap lookups go through netlify/functions/osm.js first (cached a week per airfield), then Overpass directly. v0.2 (14-Nov-2026): English/Español toggle on the AFAC record; NAD 27 and permit-status flags; Overpass fallback server, error-remark detection, 7-day per-airfield cache, Retry. v0.1 (14-Nov-2026): first build. AFAC (Mexico) aerodrome list via netlify/functions/afac.js,
      runway/ramp/taxiway shapes from OpenStreetMap (Overpass API), KML for ForeFlight User Map Layers.
      Not on the Control Panel yet (Wayne, 14-Nov-2026). With thanks to airports.robrc.net. -->
 <html lang="en">
@@ -93,7 +93,7 @@
   .btn:hover{ color:var(--amber); border-color:var(--amber); text-decoration:none; }
   .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
   .btn.primary{ color:var(--amber); border-color:var(--amber-dim); background:rgba(245,166,35,0.08); }
-  .btn[disabled]{ opacity:.45; pointer-events:none; }
+  .btn[disabled], .btn[aria-disabled="true"]{ opacity:.45; pointer-events:none; }
   .fine{ margin:10px 4px 0; font-size:11px; line-height:1.6; color:var(--text-muted); }
 
   /* results list */
@@ -231,7 +231,7 @@
 
   <div class="title-row">
     <h1>Airfield KML Builder</h1>
-    <span class="ver mono">v0.23</span>
+    <span class="ver mono">v0.24</span>
   </div>
   <p class="purpose-line"><span class="purpose-label">Purpose:</span> Find a Mexican airfield in AFAC's official list, check that it isn't already an ICAO airport, and build a KML of its runway, ramp and taxiways from AFAC and OpenStreetMap data, to import into ForeFlight (or Garmin Pilot) as a map layer.</p>
 
@@ -312,11 +312,16 @@
           <label><input type="checkbox" id="optBox" checked> Draw airfield box</label>
         </div>
         <div class="actions">
-          <button class="btn primary" id="btnOpenFF" type="button">Open in ForeFlight / Garmin Pilot (iPhone/iPad)</button>
+          <a class="btn primary" id="btnOpenFF" href="#" aria-disabled="true">Open in ForeFlight</a>
+          <button class="btn primary" id="btnOpenGP" type="button">Open in Garmin Pilot</button>
+        </div>
+        <div class="actions">
+          <button class="btn" id="btnPack" type="button">Download ForeFlight pack (.zip)</button>
           <button class="btn" id="btnShare" type="button">Share KML…</button>
           <button class="btn" id="btnDownload" type="button">Download .kml</button>
         </div>
-        <p class="hint" style="margin-top:8px">On iPhone or iPad, tap "Open in ForeFlight / Garmin Pilot": the KML opens as a file from a web link. Tap the share button and choose ForeFlight (it may be under More), and ForeFlight imports it as a User Map Layer. In Garmin Pilot, choose "Copy to Garmin Pilot", then turn it on under Map, Overlays, KML. (Garmin Pilot is untested so far: Garmin documents KML points, lines and shapes up to 4 MB, but not colors.) "Share KML…" opens the share sheet directly, but iOS doesn't always list ForeFlight there. On a computer, download the file and AirDrop or email it to the iPad.</p>
+        <p class="hint" style="margin-top:8px"><b>ForeFlight</b>: "Open in ForeFlight" sends a ForeFlight content pack. One import gives you the airfield as a map layer (turn it on in the Maps layer selector, under Custom Map Layers) and a user waypoint, <b id="wpNameHint">XSQA</b>, at AFAC's reference point with AFAC's elevation. Type the waypoint into a route on the Maps tab like any other. Tap the waypoint on the map to read the AFAC record attached to it. If ForeFlight doesn't open, press and hold the button and choose "Open in ForeFlight". Content packs need an individual ForeFlight subscription, or Performance level or higher for Business and MFB accounts. On a computer, download the pack and AirDrop or email it to the iPad. Re-importing replaces the waypoint of the same name.</p>
+        <p class="hint"><b>Garmin Pilot</b>: "Open in Garmin Pilot" opens the KML as a file from a web link. Tap the share button, choose "Copy to Garmin Pilot", then turn it on under Map, Overlays, KML. (Untested so far: Garmin documents KML points, lines and shapes up to 4 MB, but not colors.) The plain KML also imports into ForeFlight as a map layer, without the waypoint. "Share KML…" opens the share sheet directly; on a computer, download the file and AirDrop or email it.</p>
         <div class="status" id="outStatus" role="status" aria-live="polite"></div>
       </div>
     </section>
@@ -1022,7 +1027,7 @@
 
   function draw(){
     if (!geo){ drawPointOnly(); return; }
-    $('btnShare').disabled = false; $('btnDownload').disabled = false; $('btnOpenFF').disabled = false;
+    setOut(true);
     const Ly = layers(), pr = geo.prim, b = brg(pr.a, pr.b);
     if (!ensureMap()){ $('outStatus').className = 'status warn'; $('outStatus').textContent = 'The preview map didn\'t load (no connection to the map library?). The KML can still be sent.'; }
     if (map){
@@ -1067,7 +1072,7 @@
 
   // no runway yet: AFAC's point on the satellite view, KML buttons off, invite tapping the ends
   function drawPointOnly(){
-    $('btnShare').disabled = true; $('btnDownload').disabled = true; $('btnOpenFF').disabled = true;
+    setOut(false);
     $('legend').innerHTML = '<span><i style="background:transparent;border:2px solid #3fa7a0;border-radius:50%"></i>AFAC point</span>';
     $('srcList').innerHTML = '<li>No runway yet. When OpenStreetMap answers it will be drawn here; or tap <b>Mark runway ends on the map</b>.</li>';
     if (!ensureMap() || !rec || rec.lat == null) return;
@@ -1123,7 +1128,7 @@
   }
 
   // ---------- KML ----------
-  function buildKml(){
+  function buildKml(opt = {}){
     const L = layers(), r = rec, pr = geo.prim, b = brg(pr.a, pr.b);
     const c = pts => pts.map(p => `${p[1].toFixed(7)},${p[0].toFixed(7)},0`).join(' ');
     const poly = (name, style, pts) => `<Placemark><name>${esc(name)}</name><styleUrl>#${style}</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${c(pts)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
@@ -1169,11 +1174,92 @@
     if (pr.labB) k += point(pr.labB, dest(pr.b, b, 40));
     k += '</Folder>\n';
     const ref = r.lat != null ? [r.lat, r.lon] : [(pr.a[0] + pr.b[0]) / 2, (pr.a[1] + pr.b[1]) / 2];
-    k += point(r.des || r.name, ref, descr);
+    if (!opt.noArp) k += point(r.des || r.name, ref, descr);
     k += '\n</Document></kml>\n';
     return k;
   }
   const fileName = () => `${(rec.des || 'airfield')}_${rec.name}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '.kml';
+
+  // ---------- v0.24: ForeFlight content pack (map layer + a user waypoint at AFAC's point) ----------
+  // ForeFlight puts a KML with shapes into Map Layers, where its points can't go in a route; a points-only
+  // KML in a content pack's navdata/ folder imports as user waypoints. Waypoint names: 3+ characters, at
+  // least one letter, capitals, no spaces (ForeFlight support). X + AFAC's code, like the X-codes pilots use.
+  function wpName(){
+    const key = desKey(rec).replace(/[^A-Z0-9]/g, '');
+    let w = key && /[A-Z]/.test(key) ? (key.length <= 3 ? 'X' + key : key) : '';
+    if (w.length < 3) w = norm(rec.name).replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 12);
+    if (!/[A-Z]/.test(w) || w.length < 3) w = 'XAFAC';
+    return w;
+  }
+  const refPoint = () => rec.lat != null ? [rec.lat, rec.lon] : [(geo.prim.a[0] + geo.prim.b[0]) / 2, (geo.prim.a[1] + geo.prim.b[1]) / 2];
+  function recordText(wp){
+    const r = rec, ref = refPoint();
+    return [
+      `${wp}: ${r.des ? r.des + ' ' : ''}${r.name}`,
+      [r.muni, r.state].filter(Boolean).join(', ') + ', Mexico',
+      '',
+      `Reference point: ${ref[0].toFixed(6)}, ${ref[1].toFixed(6)}${r.lat != null ? ' (AFAC' + (r.datum ? ', ' + r.datum : '') + ')' : ' (runway midpoint; AFAC gives no point)'}`,
+      r.elev_m != null ? `Elevation: ${r.elev_m} m / ${ft(r.elev_m).toLocaleString('en-US')} ft (AFAC)` : 'Elevation: not in AFAC\'s list',
+      r.rwy.length ? `Runway ${r.rwy.map(pad2).join('/')}${r.len_m ? ', ' + r.len_m.toLocaleString('en-US') + ' x ' + (r.wid_m ?? '?') + ' m (' + ft(r.len_m).toLocaleString('en-US') + ' x ' + (r.wid_m ? ft(r.wid_m) : '?') + ' ft)' : ''}${r.surf ? ', ' + r.surf : ''} (AFAC)` : '',
+      r.ops ? `Operation (AFAC): ${r.ops}` : '',
+      r.svc ? `Service (AFAC): ${r.svc}` : '',
+      `AFAC permit ${r.file || '-'}, ${r.status || ''}${r.expires ? ', expires ' + fmtDate(r.expires) : ''}`,
+      '',
+      `Source: AFAC "Aerodromos y helipuertos" list (gob.mx, ${DATA.source.edition || 'current'} edition). With thanks to airports.robrc.net.`,
+      `Built ${fmtDate(new Date().toISOString())} with GeezerGeek Pilot Airfield KML Builder, https://airfield-kml-builder.netlify.app/`,
+      'NOT FOR NAVIGATION.',
+    ].filter(x => x !== '' || true).join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
+  }
+  function waypointKml(wp){
+    const ref = refPoint(), el = rec.elev_m != null ? rec.elev_m : 0;
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>\n<name>${esc(wp)}</name>\n` +
+      `<Placemark><name>${esc(wp)}</name><description>${esc((rec.des ? rec.des + ' ' : '') + rec.name + ', ' + [rec.muni, rec.state].filter(Boolean).join(', ') + ' (AFAC reference point)')}</description>` +
+      `<Point><coordinates>${ref[1].toFixed(7)},${ref[0].toFixed(7)},${el}</coordinates></Point></Placemark>\n</Document></kml>\n`;
+  }
+  function packFiles(){
+    const wp = wpName(), base = fileName().replace(/\.kml$/, '');
+    return { wp, files: {
+      [`${wp}/manifest.json`]: JSON.stringify({ name: `${wp} ${rec.name}`.slice(0, 60), abbreviation: wp, version: 1,
+        effectiveDate: new Date().toISOString().slice(0, 10).replace(/-/g, '') + 'T00:00:00Z', organizationName: 'GeezerGeek Pilot Airfield KML Builder' }, null, 1),
+      [`${wp}/layers/${base}.kml`]: buildKml({ noArp: true }),
+      [`${wp}/navdata/${wp}.kml`]: waypointKml(wp),
+      // ForeFlight ties a navdata document to the waypoint whose name starts its file name
+      [`${wp}/navdata/${wp}AFAC record.txt`]: recordText(wp),
+    } };
+  }
+  async function b64deflate(text){
+    const cs = new Blob([text]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const bytes = new Uint8Array(await new Response(cs).arrayBuffer());
+    let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  // the ForeFlight button is a real link (ForeFlight opens content packs from https://foreflight.com/content?downloadURL=…),
+  // refreshed whenever the drawing changes, so a tap is a plain link tap that iOS hands to the app
+  let linkTimer = null, packUrl = '';
+  function setOut(on){
+    $('btnShare').disabled = !on; $('btnDownload').disabled = !on; $('btnOpenGP').disabled = !on; $('btnPack').disabled = !on;
+    if (!on){ packUrl = ''; $('btnOpenFF').setAttribute('aria-disabled', 'true'); $('btnOpenFF').href = '#'; return; }
+    clearTimeout(linkTimer); linkTimer = setTimeout(refreshPackLink, 250);
+  }
+  async function refreshPackLink(){
+    if (!geo) return;
+    try {
+      const { wp, files } = packFiles();
+      $('wpNameHint').textContent = wp;
+      const d = await b64deflate(JSON.stringify(files));
+      if (d.length > 60000){ packUrl = ''; $('btnOpenFF').setAttribute('aria-disabled', 'true'); return; }
+      packUrl = `${location.origin}/.netlify/functions/pack?n=${encodeURIComponent(wp)}&d=${d}`;
+      $('btnOpenFF').href = 'https://foreflight.com/content?downloadURL=' + encodeURIComponent(packUrl);
+      $('btnOpenFF').setAttribute('aria-disabled', 'false');
+    } catch (e){ $('btnOpenFF').setAttribute('aria-disabled', 'true'); }
+  }
+  async function downloadPack(){
+    if (!geo) return;
+    if (!packUrl) await refreshPackLink();
+    if (!packUrl){ $('outStatus').className = 'status warn'; $('outStatus').textContent = 'The pack is too big for a link. Use Download .kml.'; return; }
+    window.location.href = packUrl;
+    $('outStatus').className = 'status ok'; $('outStatus').textContent = `Downloading ${wpName()}.zip. AirDrop or email it to the iPad and open it in ForeFlight.`;
+  }
 
   // v0.13: the KML as a real link (netlify/functions/kml.js echoes it back as a .kml download), the way
   // ForeFlight documents importing KML. Compressed so the link stays short.
@@ -1236,7 +1322,9 @@
   $('q').addEventListener('search', onQuery);
   $('q').addEventListener('keydown', e => { if (e.key === 'Enter'){ const li = $('results').querySelector('li'); if (li) li.click(); } });
   $('btnShare').addEventListener('click', share);
-  $('btnOpenFF').addEventListener('click', openViaLink);
+  $('btnOpenGP').addEventListener('click', openViaLink);
+  $('btnPack').addEventListener('click', downloadPack);
+  $('btnOpenFF').addEventListener('click', e => { if ($('btnOpenFF').getAttribute('aria-disabled') === 'true') e.preventDefault(); });
   $('btnPick').addEventListener('click', startPicking);
   $('btnDownload').addEventListener('click', () => download());
   $('buf').addEventListener('input', () => { save(); if (geo) draw(); });

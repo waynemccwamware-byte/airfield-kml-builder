@@ -44,7 +44,8 @@
       { id: 'fuel_truck',   label: 'Small fuel truck',    path: 'lib/airport/Common_Elements/vehicles/Small_Fuel_Truck.obj', fp: [3, 8] },
     ]},
     { group: 'Aircraft and vehicles', items: [
-      { id: 'ac_prop',      label: 'Parked single (generic)', path: 'lib/airport/aircraft/general_aviation/prop_a.obj',     fp: [11, 8] },
+      // v0.54: prop_a.obj is a random pick (Wayne's X-Plane 12 library.txt: PA-28s, C172s and a BE58 Baron) — the "twin" at XSBY
+      { id: 'ac_prop',      label: 'Parked light aircraft (X-Plane picks: PA-28, C172 or Baron)', path: 'lib/airport/aircraft/general_aviation/prop_a.obj', fp: [11, 9] },
       { id: 'ac_c172',      label: 'Parked Cessna 172',   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 fp: [11, 8], front: 0, frontName: 'Nose' },
       { id: 'car',          label: 'Parked car',          path: 'lib/cars/car_static.obj',                                fp: [2, 5], front: 0, frontName: 'Front' },
     ]},
@@ -411,7 +412,11 @@
     if (!aptIt) throw new Error('no apt.dat or layout file found in what you chose');
     const apt = parseAptDat(await txt(aptIt));
     const objs = [], unknown = new Set(), errors = [];
-    const place = list => list.forEach(o => { const c = BY_PATH[o.path]; if (c) objs.push({ id: c.id, lat: o.lat, lon: o.lon, hdg: o.hdg }); else unknown.add(o.path); });
+    // a windsock placed as an object (Gateway packs do this) counts as the airport's windsock (v0.54)
+    const place = list => list.forEach(o => { const c = BY_PATH[o.path];
+      if (c) objs.push({ id: c.id, lat: o.lat, lon: o.lon, hdg: o.hdg });
+      else if (/landscape\/windsock/.test(o.path)){ if (!apt.windsock) apt.windsock = [o.lat, o.lon]; }
+      else unknown.add(o.path); });
     for (const it of items.filter(it => /\.txt$/i.test(it.name) && !/readme|copying/i.test(it.name))){
       try { const t = await txt(it); if (/^\s*OBJECT_DEF\b/m.test(t) || /^PROPERTY sim\//m.test(t)) place(parseDsfText(t)); } catch (e){ errors.push(it.name.split('/').pop() + ': ' + e.message); }
     }

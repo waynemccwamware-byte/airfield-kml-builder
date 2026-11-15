@@ -71,9 +71,14 @@ exports.handler = async (event) => {
       files.push([path, text]);
     }
     if (!files.length || files.length > 8) throw new Error('no files');
+    const body = zip(files);
     return {
       statusCode: 200,
       headers: {
+        // v0.30: a plain .zip file from the same site installs in ForeFlight; this function's answer had no
+        // Content-Length (sent in chunks) and didn't. Give ForeFlight the length up front.
+        'Content-Length': String(body.length),
+        'Accept-Ranges': 'none',
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${name}.zip"`,
         // v0.29: never cached — the CDN served an older build of the same pack URL during testing (14-Nov-2026)
@@ -81,7 +86,7 @@ exports.handler = async (event) => {
         'Netlify-CDN-Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },
-      body: zip(files).toString('base64'),
+      body: body.toString('base64'),
       isBase64Encoded: true,
     };
   } catch (e) {

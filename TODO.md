@@ -22,3 +22,10 @@ Open items from v0.1:
 - Consider robrc.net's "applied corrections" to AFAC's figures (ask robrc.net).
 - Mexican Airport System XLSX (AIP airports) not used yet.
 - Add a row to the Control Panel's Open Counts page if/when the app goes on the Control Panel.
+
+## X-Plane airport export (on hold, 14-Nov-2026)
+- Idea: generate an apt.dat 1200 scenery pack (zip: "<ID> <Name>/Earth nav data/apt.dat") from the same runway/ramp/taxi geometry:
+  row 1 header (elev ft, ID, name), row 100 runway (surface 1 asphalt / 2 concrete / 3 grass / 4 dirt / 5 gravel), 110–116 pavement, 1302 metadata, 19 windsock, 1300 tie-down.
+- Use: drop into Custom Scenery to fly, or WED File → Import apt.dat → refine → validate → Export to Gateway.
+- Gateway needs a "New Airport Code Request" for strips without codes; don't import apt.dat for airports already on the Gateway (lossy) — add an "already in X-Plane?" check (Gateway API, gateway.x-plane.com/api).
+- Waiting on: Wayne's WED-exported apt.dat (SQA or San Juanico) as the reference for exact 1302 key names.

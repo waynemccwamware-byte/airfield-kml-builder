@@ -35,7 +35,12 @@
     { group: 'Fuel', items: [
       { id: 'fuel_drums',   label: 'Fuel drums',          path: 'lib/g10/US/industrial/light/OilDrums.obj',               fp: [3, 3] },
       { id: 'fuel_station', label: 'Small fuel station',  path: 'lib/airport/Common_Elements/Fueling_Stations/Small_Fuel_Station.obj', fp: [6, 4] },
-      { id: 'fuel_tank',    label: 'Small fuel tank',     path: 'lib/airport/Common_Elements/Fuel_Storage/Sing_Tank_Small.obj', fp: [4, 4] },
+      // v0.53: sizes measured from the models' vertices in Wayne's X-Plane 12 install (15-Nov-2026). "Sing_Tank_Small"
+      // is a 14 m Jet A-1 storage tank (Wayne's XSBY test), so it's relabeled; real avgas pieces added.
+      { id: 'fuel_avgas_tank', label: 'Avgas tank, horizontal (2 × 9 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/tank_78_avgas_1.obj', fp: [2.2, 8.8] },
+      { id: 'fuel_avgas_stn',  label: 'Avgas station, tank + pump (3 × 8 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/station_small_avgas.obj', fp: [3.3, 7.5] },
+      { id: 'fuel_avgas_pump', label: 'Avgas 100LL pump',  path: 'lib/airport/Common_Elements/Fueling_Stations/fuel_station_white_avgas100LL.obj', fp: [1.8, 1.9] },
+      { id: 'fuel_tank',    label: 'Storage tank, large (14 m, Jet A-1)', path: 'lib/airport/Common_Elements/Fuel_Storage/Sing_Tank_Small.obj', fp: [13.8, 13.8] },
       { id: 'fuel_truck',   label: 'Small fuel truck',    path: 'lib/airport/Common_Elements/vehicles/Small_Fuel_Truck.obj', fp: [3, 8] },
     ]},
     { group: 'Aircraft and vehicles', items: [

@@ -1,4 +1,5 @@
-// Mexican Airstrips for your EFB and Sim — X-Plane scenery export (step 6; from v0.35, 15-Nov-2026).
+// Mexican Airstrips for your EFB and Sim — X-Plane scenery export (step 6; from v0.35, 15-Nov-2026), and since v0.51
+// reading packs back in (zip / apt.dat / DSF / layout file) so a layout can be edited again on another device.
 //
 // Builds a custom-scenery pack in the browser:
 //   <ID> <Name>/Earth nav data/apt.dat          — APT.DAT 1200 (X-Plane 12 / WED 2.5+), modeled on Wayne's
@@ -246,10 +247,13 @@
   }
 
   // ---------- the whole pack ----------
-  // objs: [{id (catalog), lat, lon, hdg}]
-  function pack(m, objs, readme){
+  // objs: [{id (catalog), lat, lon, hdg}]; layout (v0.51): the app's editable layout, saved in the pack as LAYOUT_FILE
+  // so opening the zip in the app later (any device) brings back exactly what was on the map. X-Plane ignores the file.
+  const LAYOUT_FILE = 'mx-airstrips-layout.json';
+  function pack(m, objs, readme, layout){
     const folder = `${m.id} ${m.name}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 _-]+/g, '').trim().slice(0, 60);
     const files = [[`${folder}/Earth nav data/apt.dat`, aptDat(m)], [`${folder}/README.txt`, readme]];
+    if (layout) files.push([`${folder}/${LAYOUT_FILE}`, JSON.stringify(layout, null, 1)]);
     const placed = objs.map(o => ({ path: BY_ID[o.id].path, lat: o.lat, lon: o.lon, hdg: o.hdg }));
     const byTile = {};
     placed.forEach(o => { const k = tileOf(o.lat, o.lon).join(','); (byTile[k] = byTile[k] || []).push(o); });
@@ -257,7 +261,145 @@
     return { name: folder + '.zip', blob: zip(files), files };
   }
 
-  const api = { CATALOG, BY_ID, aptDat, dsf, md5, zip, pack, ccw, ribbon, dest, brg, dist };
+
+  // =====================================================================================================
+  // v0.51 — reading scenery back in (Wayne, 15-Nov-2026: a layout made on one computer and emailed to another
+  // couldn't be edited further). Reads a zip (stored or deflated), or loose apt.dat / .dsf / layout files.
+  // =====================================================================================================
+
+  // ---------- ZIP reader: central directory; method 0 (stored) or 8 (deflate, via the browser's DecompressionStream) ----------
+  async function unzip(buf){
+    const u = new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+    let e = -1;
+    for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--){ if (dv.getUint32(i, true) === 0x06054b50){ e = i; break; } }
+    if (e < 0) throw new Error('not a zip file');
+    const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+    const out = [];
+    for (let k = 0; k < n; k++){
+      if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('damaged zip directory');
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+      const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl));
+      p += 46 + nl + xl + cl;
+      if (name.endsWith('/') || /(^|\/)__MACOSX\/|(^|\/)\._/.test(name)) continue;
+      const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+      out.push({ name, method, raw: u.subarray(start, start + csize) });
+    }
+    return out;
+  }
+  async function entryBytes(en){
+    if (en.method === 0) return en.raw;
+    if (en.method !== 8) throw new Error(`${en.name}: unsupported zip compression`);
+    if (typeof DecompressionStream === 'undefined') throw new Error('this browser can\'t unzip compressed files; unzip it first and choose the apt.dat and .dsf');
+    const ds = new Blob([en.raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(ds).arrayBuffer());
+  }
+
+  // ---------- apt.dat → the first airport's runway, ramps, windsock, start positions ----------
+  function parseAptDat(text){
+    const out = { id: null, name: '', local: null, datum: null, runway: null, pavements: [], windsock: null, starts: [] };
+    let cur = null, seenApt = false;
+    for (const line of text.split(/\r?\n/)){
+      const t = line.trim().split(/\s+/), c = t[0];
+      if (c === '1' || c === '16' || c === '17'){ if (seenApt) break; seenApt = true; out.id = t[4]; out.name = t.slice(5).join(' '); continue; }
+      if (!seenApt) continue;
+      if (c === '1302'){
+        if (t[1] === 'local_code' && t[2]) out.local = t[2];
+        if (t[1] === 'datum_lat') out.datum = [parseFloat(t[2]), out.datum ? out.datum[1] : null];
+        if (t[1] === 'datum_lon') out.datum = [out.datum ? out.datum[0] : null, parseFloat(t[2])];
+      } else if (c === '100' && !out.runway){
+        out.runway = { widthM: parseFloat(t[1]), surface: +t[2], labA: t[8], a: [parseFloat(t[9]), parseFloat(t[10])], labB: t[17], b: [parseFloat(t[18]), parseFloat(t[19])] };
+      } else if (c === '110'){
+        cur = { name: t.slice(4).join(' '), pts: [] }; out.pavements.push(cur);
+      } else if ((c === '111' || c === '112' || c === '113' || c === '114') && cur){
+        cur.pts.push([parseFloat(t[1]), parseFloat(t[2])]);
+        if (c === '113' || c === '114') cur = null;            // first ring only (holes ignored)
+      } else if (c === '130'){ cur = null;
+      } else if (c === '19' && !out.windsock){ out.windsock = [parseFloat(t[1]), parseFloat(t[2])];
+      } else if (c === '1300' || c === '15'){
+        out.starts.push({ lat: parseFloat(t[1]), lon: parseFloat(t[2]), hdg: parseFloat(t[3]), name: t.slice(c === '15' ? 4 : 6).join(' ') });
+      }
+    }
+    if (!seenApt) throw new Error('no airport found in the apt.dat');
+    return out;
+  }
+
+  // ---------- DSF → placed objects [{path, lat, lon, hdg}] ----------
+  // Reads the atoms (DSF File Format Specification): OBJT names, 16-bit POOL/SCAL point pools, and the CMDS object commands.
+  // Polygons, networks and terrain are skipped. Global-scenery DSFs are 7-Zip compressed; overlays from WED are not.
+  function parseDsf(bytes){
+    const u = bytes, dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+    const tag = String.fromCharCode(...u.subarray(0, 8));
+    if (tag.startsWith('7z')) throw new Error('this DSF is 7-Zip compressed (unpack it with DSFTool first)');
+    if (tag !== 'XPLNEDSF') throw new Error('not a DSF file');
+    const id = o => String.fromCharCode(u[o + 3], u[o + 2], u[o + 1], u[o]);
+    function atoms(start, end){ const a = []; let o = start; while (o + 8 <= end){ const len = dv.getUint32(o + 4, true); if (len < 8 || o + len > end) break; a.push({ id: id(o), s: o + 8, e: o + len }); o += len; } return a; }
+    const strs = (s, e) => new TextDecoder().decode(u.subarray(s, e)).split('\0').filter(Boolean);
+    const top = atoms(12, u.length - 16), get = (list, k) => list.filter(x => x.id === k);
+    const defn = get(top, 'DEFN')[0], geod = get(top, 'GEOD')[0], cmds = get(top, 'CMDS')[0];
+    if (!defn || !geod || !cmds) return [];
+    const objt = get(atoms(defn.s, defn.e), 'OBJT').flatMap(a => strs(a.s, a.e));
+    const g = atoms(geod.s, geod.e), pools = get(g, 'POOL').map(a => decodePool(a.s, a.e)), scal = get(g, 'SCAL').map(a => { const f = []; for (let o = a.s; o + 8 <= a.e; o += 8) f.push([dv.getFloat32(o, true), dv.getFloat32(o + 4, true)]); return f; });
+    function decodePool(s, e){
+      const n = dv.getUint32(s, true), planes = u[s + 4]; let o = s + 5; const P = [];
+      for (let k = 0; k < planes; k++){
+        const enc = u[o++], v = new Array(n); let i = 0;
+        if (enc & 2){ while (i < n && o < e){ const code = u[o++], cnt = code & 127; if (code & 128){ const x = dv.getUint16(o, true); o += 2; for (let j = 0; j < cnt; j++) v[i++] = x; } else { for (let j = 0; j < cnt; j++){ v[i++] = dv.getUint16(o, true); o += 2; } } } }
+        else { for (; i < n; i++){ v[i] = dv.getUint16(o, true); o += 2; } }
+        if (enc & 1){ let acc = 0; for (let j = 0; j < n; j++){ acc = (acc + v[j]) & 0xffff; v[j] = acc; } }
+        P.push(v);
+      }
+      return P;
+    }
+    const out = []; let pool = 0, def = 0, o = cmds.s;
+    const place = i => { const P = pools[pool], S = scal[pool]; if (!P || !S || objt[def] == null) return;
+      const val = k => P[k][i] / 65535 * S[k][0] + S[k][1];
+      out.push({ path: objt[def], lon: val(0), lat: val(1), hdg: ((val(2) % 360) + 360) % 360 }); };
+    const U8 = () => u[o++], U16 = () => { const x = dv.getUint16(o, true); o += 2; return x; }, U32 = () => { const x = dv.getUint32(o, true); o += 4; return x; };
+    while (o < cmds.e){
+      const c = U8();
+      if (c === 1) pool = U16(); else if (c === 2) U32(); else if (c === 3) def = U8(); else if (c === 4) def = U16(); else if (c === 5) def = U32();
+      else if (c === 6) U8();
+      else if (c === 7) place(U16());
+      else if (c === 8){ const a = U16(), b = U16(); for (let i = a; i < b; i++) place(i); }
+      else if (c === 9){ const n = U8(); o += 2 * n; } else if (c === 10) o += 4; else if (c === 11){ const n = U8(); o += 4 * n; }
+      else if (c === 12){ U16(); const n = U8(); o += 2 * n; } else if (c === 13) o += 6;
+      else if (c === 14){ U16(); const n = U8(); for (let j = 0; j < n; j++){ const m = U8(); o += 2 * m; } }
+      else if (c === 15){ U16(); const n = U8(); o += 2 * (n + 1); }
+      else if (c === 16){} else if (c === 17) o += 1; else if (c === 18) o += 9; else if (c === 19) o += 1;
+      else if (c === 23 || c === 26 || c === 29){ const n = U8(); o += 2 * n; }
+      else if (c === 24 || c === 27 || c === 30){ const n = U8(); o += 4 * n; }
+      else if (c === 25 || c === 28 || c === 31) o += 4;
+      else if (c === 32){ const n = U8(); o += n; } else if (c === 33){ const n = U16(); o += n; } else if (c === 34){ const n = U32(); o += n; }
+      else break;                                              // unknown command: stop, keep what we have
+    }
+    return out;
+  }
+
+  // ---------- read a scenery pack: zip or loose files → { layout } (our own file) or { apt, objs } ----------
+  async function readScenery(files){
+    const items = [];
+    for (const f of files){
+      const buf = new Uint8Array(await f.arrayBuffer());
+      if (/\.zip$/i.test(f.name) || (buf[0] === 0x50 && buf[1] === 0x4b)) for (const en of await unzip(buf)) items.push({ name: en.name, get: () => entryBytes(en) });
+      else items.push({ name: f.name, get: async () => buf });
+    }
+    const txt = async it => new TextDecoder().decode(await it.get());
+    const lay = items.find(it => it.name.split('/').pop() === LAYOUT_FILE || /\.json$/i.test(it.name));
+    if (lay){ try { const L = JSON.parse(await txt(lay)); if (L && L.app === 'mx-airstrips') return { layout: L }; } catch (e){} }
+    const aptIt = items.find(it => /(^|\/)apt\.dat$/i.test(it.name));
+    if (!aptIt) throw new Error('no apt.dat or layout file found in what you chose');
+    const apt = parseAptDat(await txt(aptIt));
+    const objs = [], unknown = new Set(), errors = [];
+    for (const it of items.filter(it => /\.dsf$/i.test(it.name))){
+      try { parseDsf(await it.get()).forEach(o => { const c = BY_PATH[o.path]; if (c) objs.push({ id: c.id, lat: o.lat, lon: o.lon, hdg: o.hdg }); else unknown.add(o.path); }); }
+      catch (e){ errors.push(it.name.split('/').pop() + ': ' + e.message); }
+    }
+    return { apt, objs, unknown: [...unknown], errors };
+  }
+  const BY_PATH = {}; CATALOG.forEach(g => g.items.forEach(i => { BY_PATH[i.path] = i; }));
+
+  const api = { CATALOG, BY_ID, BY_PATH, LAYOUT_FILE, aptDat, dsf, md5, zip, pack, ccw, ribbon, dest, brg, dist, unzip, parseAptDat, parseDsf, readScenery };
   if (typeof window !== 'undefined') window.XP = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();

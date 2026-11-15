@@ -23,6 +23,18 @@ Open items from v0.1:
 - Mexican Airport System XLSX (AIP airports) not used yet.
 - Add a row to the Control Panel's Open Counts page if/when the app goes on the Control Panel.
 
+## X-Plane layouts travel — v0.51 (15-Nov-2026)
+Wayne: a layout made on another computer and emailed here couldn't be edited further. Agreed order: (1) layout JSON in
+the zip, (2) share links, (3) reopen our own zips, (4) apt.dat import from other zips. All four in v0.51:
+- zip carries `mx-airstrips-layout.json` (same object saved in localStorage: ID, ramp, tie-downs, windsock, objects, runway ends).
+- "Open a scenery zip" (step 1 hint + X-Plane tab): our zip → exact layout; zip without it (v0.35–v0.50, WED, Gateway) →
+  apt.dat runway (used only if >6 m from the app's), 4-corner "Ramp" → added ramp, windsock, 1300 starts, DSF objects that
+  match the catalog by path (others listed, left out). Deflated zips via DecompressionStream; loose apt.dat/.dsf accepted.
+- "Share layout link": ?xp=z<base64url(deflate-raw JSON)> (~330–400 chars); opening it loads the airfield + layout.
+- Runway ends the pilot placed now persist per airfield (airfieldKml.ends.<des>|<name>).
+- Replacing a different saved layout asks first (confirm).
+Later / parked (Wayne: less important): pull an existing airport from the Scenery Gateway or a WED project.
+
 ## X-Plane airport export — LIVE in v0.35 (15-Nov-2026)
 - X-Plane pane under the step 5 map (v0.36; was a separate step 6 in v0.35): site/xplane.js writes apt.dat 1200 (runway from AFAC numbers/width/surface, ramp + taxiway
   pavement from OSM, boundary = airfield box, windsock, tie-downs, AFAC elevation, city/state/country/local_code/region_code)

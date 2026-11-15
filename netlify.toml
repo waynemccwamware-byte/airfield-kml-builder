@@ -7,10 +7,3 @@
 [functions]
   directory = "netlify/functions"
 
-# TEMPORARY (14-Nov-2026): a long path that serves the plain test pack, to tell ForeFlight's long-link failure
-# apart from the function's chunked answer. Remove with site/fftest/.
-[[redirects]]
-  from = "/fftest/long/*"
-  to = "/fftest/TSTG.zip"
-  status = 200
-  force = true

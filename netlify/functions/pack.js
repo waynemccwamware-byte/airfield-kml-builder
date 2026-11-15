@@ -7,7 +7,8 @@
 // Nothing is stored: the files travel in the URL (deflate-raw + base64url JSON {path: text}), and come
 // back zipped. No npm packages (App Conventions §1).
 //
-// GET /.netlify/functions/pack?n=<pack name>&d=<base64url(deflate-raw(JSON))>
+// GET /.netlify/functions/pack/<base64url(deflate-raw(JSON)), split into 200-char path segments>/<pack name>.zip
+// (older form, still accepted: /.netlify/functions/pack?n=<pack name>&d=<…>)
 
 const zlib = require('zlib');
 
@@ -43,7 +44,11 @@ function zip(files){
 }
 
 exports.handler = async (event) => {
-  const q = (event && event.queryStringParameters) || {};
+  const q = Object.assign({}, (event && event.queryStringParameters) || {});
+  // v0.26: path form /.netlify/functions/pack/<d in 200-char segments>/<NAME>.zip — ForeFlight takes the text after
+  // the last "/" as the file name and only imports it as a content pack when that ends in .zip (Wayne, iOS, 14-Nov-2026)
+  const m = /\/pack\/(.+)\/([A-Za-z0-9_-]+)\.zip$/.exec((event && (event.rawUrl ? new URL(event.rawUrl).pathname : event.path)) || '');
+  if (m){ q.d = m[1].replace(/\//g, ''); q.n = m[2]; }
   try {
     if (!q.d || q.d.length > 60000) throw new Error('missing or too large');
     const json = zlib.inflateRawSync(Buffer.from(q.d.replace(/-/g, '+').replace(/_/g, '/'), 'base64'), { maxOutputLength: 3_000_000 }).toString('utf8');

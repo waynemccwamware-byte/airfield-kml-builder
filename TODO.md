@@ -24,7 +24,7 @@ Open items from v0.1:
 - Add a row to the Control Panel's Open Counts page if/when the app goes on the Control Panel.
 
 ## X-Plane airport export — LIVE in v0.35 (15-Nov-2026)
-- Step 6 (collapsed by default): site/xplane.js writes apt.dat 1200 (runway from AFAC numbers/width/surface, ramp + taxiway
+- X-Plane pane under the step 5 map (v0.36; was a separate step 6 in v0.35): site/xplane.js writes apt.dat 1200 (runway from AFAC numbers/width/surface, ramp + taxiway
   pavement from OSM, boundary = airfield box, windsock, tie-downs, AFAC elevation, city/state/country/local_code/region_code)
   and, if objects are placed, an overlay DSF (library objects, sim/filter/aptid = the ID; byte-identical to WED 2.5.2r1 for
   Wayne's XMM000J object). Default ID X+AFAC code (XSQA). Wayne loaded the SQA sample in X-Plane 12 on 15-Nov-2026: all good.

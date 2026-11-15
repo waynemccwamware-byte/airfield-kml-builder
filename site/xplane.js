@@ -46,12 +46,12 @@
       { id: 'fuel_avgas_stn',  label: 'Avgas station, tank + pump (3 × 8 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/station_small_avgas.obj', box: [-1.7, 1.7, -7.0, 0.5] },
       { id: 'fuel_avgas_pump', label: 'Avgas 100LL pump',  path: 'lib/airport/Common_Elements/Fueling_Stations/fuel_station_white_avgas100LL.obj', box: [-1.0, 0.8, -1.1, 0.9] },
       { id: 'fuel_tank',    label: 'Storage tank, large (14 m, Jet A-1)', path: 'lib/airport/Common_Elements/Fuel_Storage/Sing_Tank_Small.obj', box: [-6.8, 6.9, -6.8, 6.9] },
-      { id: 'fuel_truck',   label: 'Small fuel truck',    path: 'lib/airport/Common_Elements/vehicles/Small_Fuel_Truck.obj', box: [-1.6, 1.6, -8.4, 2.3] },
+      { id: 'fuel_truck',   label: 'Small fuel truck',    path: 'lib/airport/Common_Elements/Vehicles/Fuel_Truck_Small.obj', box: [-1.3, 1.3, -4.4, 0.8] },   // v0.57: public path (vehicles/Small_Fuel_Truck.obj is DEPRECATED)
     ]},
     { group: 'Aircraft and vehicles', items: [
       // v0.54: prop_a.obj is a random pick (Wayne's X-Plane 12 library.txt: PA-28s, C172s and a BE58 Baron) — the "twin" at XSBY
       { id: 'ac_prop',      label: 'Parked light aircraft (X-Plane picks: PA-28, C172 or Baron)', path: 'lib/airport/aircraft/general_aviation/prop_a.obj', box: [-6.0, 6.0, -3.0, 5.7] },
-      { id: 'ac_c172',      label: 'Parked Cessna 172',   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 box: [-6.0, 6.0, -3.0, 5.7], front: 0, frontName: 'Nose' },
+      { id: 'ac_c172',      label: 'Parked Cessna 172 (local use only: the Gateway rejects it)', noGateway: true,   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 box: [-6.0, 6.0, -3.0, 5.7], front: 0, frontName: 'Nose' },
       { id: 'car',          label: 'Parked car',          path: 'lib/cars/car_static.obj',                                box: [-0.9, 0.9, -2.1, 2.1], front: 0, frontName: 'Front' },
     ]},
     { group: 'Other', items: [
@@ -62,6 +62,8 @@
       { id: 'flag',         label: 'Flagpole',            path: 'lib/airport/Common_Elements/Miscellaneous/Flagpole.obj',  box: [-0.9, 1.0, -0.5, 1.6] },
     ]},
   ];
+  // v0.57: every path checked against the PUBLIC / PRIVATE / DEPRECATED sections of Wayne's X-Plane 12 library.txt files;
+  // all PUBLIC except Cessna_172.obj (DEPRECATED, no public C172-only path: prop_a.obj is the public random GA single/twin).
   const BY_ID = {}; CATALOG.forEach(g => g.items.forEach(i => { if (!i.box) i.box = [-2, 2, -2, 2]; i.fp = [i.box[1] - i.box[0], i.box[3] - i.box[2]]; BY_ID[i.id] = i; }));
 
   // ---------- small geodesy (meters, true degrees) ----------
@@ -186,15 +188,16 @@
     const q = (v, off, scale) => Math.max(0, Math.min(65535, Math.round((v - off) / scale * 65535)));
     // objects grouped by definition, so each definition is one contiguous range of points
     const order = []; defs.forEach((d, di) => objs.forEach(o => { if (o.path === d) order.push([o, di]); }));
-    const pts = order.map(([o]) => [q(o.lon, offLon, sc), q(o.lat, offLat, sc), q(((o.hdg % 360) + 360) % 360, 0, 360), 0]);
-    const scal = new Buf(); [[sc, offLon], [sc, offLat], [360, 0], [1, 0]].forEach(([a, c]) => scal.f32(a).f32(c));
+    // v0.57: draped objects = 3 planes (lon, lat, rotation), per xptools DSFLib.h obj_ModeDraped; the 4-plane AGL form
+    // copied from WED made Gateway validation warn "set_AGL=0.0m is discouraged" (Wayne, XMM000K, 15-Nov-2026)
+    const pts = order.map(([o]) => [q(o.lon, offLon, sc), q(o.lat, offLat, sc), q(((o.hdg % 360) + 360) % 360, 0, 360)]);
+    const scal = new Buf(); [[sc, offLon], [sc, offLat], [360, 0]].forEach(([a, c]) => scal.f32(a).f32(c));
     const po32a = new Buf(); po32a.u32(0).u8(4).bytes([3, 3, 3, 3]);
     const sc32a = new Buf(); [[1, w], [1, s], [65535, -32768], [0, 0]].forEach(([a, c]) => sc32a.f32(a).f32(c));
     const po32b = new Buf(); po32b.u32(0).u8(0);
-    const geod = atom('GEOD', [...atom('POOL', pool16(pts, 4)), ...atom('SCAL', scal.a), ...atom('PO32', po32a.a), ...atom('SC32', sc32a.a), ...atom('PO32', po32b.a), ...atom('SC32', [])]);
+    const geod = atom('GEOD', [...atom('POOL', pool16(pts, 3)), ...atom('SCAL', scal.a), ...atom('PO32', po32a.a), ...atom('SC32', sc32a.a), ...atom('PO32', po32b.a), ...atom('SC32', [])]);
     const c = new Buf();
     c.u8(2).u32(0);                                         // junction offset 0
-    c.u8(32).u8(6).u16(2).i32(1);                           // comment type 2 (as WED 2.5.2r1 writes)
     c.u8(32).u8(6).u16(1).i32(0);                           // comment type 1: filter index 0 = sim/filter/aptid
     let i = 0;
     defs.forEach((d, di) => {

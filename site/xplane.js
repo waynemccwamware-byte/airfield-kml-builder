@@ -17,47 +17,52 @@
   'use strict';
 
   // ---------- library objects offered (every path seen in Gateway airports' DSFs) ----------
-  // fp = rough footprint in meters [width, depth] for the preview only (X-Plane uses the model's own size)
+  // box (v0.56) = the model's ground extent in its own coordinates [xmin, xmax, zmin, zmax] in meters, at heading 0:
+  // +x = right (east), -z = forward (north). Measured from the vertices of the models in Wayne's X-Plane 12 library
+  // (15-Nov-2026); hangars/office are AGPs: their main building OBJ placed at its AGP offset. Many models aren't centered
+  // on their placement point (the arched hangar runs 0 → 30 m forward of it), and the map used to draw every box
+  // centered, so things that touched on the map had gaps in X-Plane (Wayne, XMM000K). prop_a: estimated from the C172.
+  // fp (derived below) = [width, depth] for sizing handles.
   // front = where the object's door/nose points, in degrees from its X-Plane heading (v0.49). Estimated from Wayne's XASN
   // screenshot (15-Nov-2026: small blue hangar, Cessna 172 and car all at heading 100): aircraft and car noses point along the
   // heading; the small hangars' door is 90° left of it. Objects without front: not checked yet, so the app shows plain Hdg.
   const CATALOG = [
     { group: 'Hangars', items: [
-      { id: 'hgr_sm_gray',  label: 'Small hangar, gray',  path: 'lib/airport/Common_Elements/Hangars/Sm_Gray_Hangar.agp',  fp: [16, 14], front: -90, frontName: 'Door' },
-      { id: 'hgr_sm_blue',  label: 'Small hangar, blue',  path: 'lib/airport/Common_Elements/Hangars/Sm_Blue_Hangar.agp',  fp: [16, 14], front: -90, frontName: 'Door' },
-      { id: 'hgr_sm_brown', label: 'Small hangar, brown', path: 'lib/airport/Common_Elements/Hangars/Sm_Brown_Hangar.agp', fp: [16, 14], front: -90, frontName: 'Door' },
-      { id: 'hgr_med_gray', label: 'Medium hangar, gray', path: 'lib/airport/Common_Elements/Hangars/Med_Gray_Hangar.agp', fp: [24, 20] },
-      { id: 'hgr_eu_25',    label: 'Hangar 25 × 20 m',    path: 'lib/airport/European_Airports/hangars/25x20x5.obj',      fp: [25, 20] },
-      { id: 'hgr_arch_30',  label: 'Arched hangar 30 × 30 m (X-Plane 12.2+)', path: 'lib/airport/hangars/arched/30x30/gray_1.obj', fp: [30, 30] },
-      { id: 'shed_tin',     label: 'Tin shed 10 × 30 m',  path: 'lib/g10/US/industrial/light/TinShed10x30Lt.obj',         fp: [10, 30] },
-      { id: 'shed_wood',    label: 'Wood shed 8 × 10 m',  path: 'lib/g10/US/industrial/light/WoodShed8x10.obj',           fp: [8, 10] },
+      { id: 'hgr_sm_gray',  label: 'Small hangar, gray (12 × 10 m)',  path: 'lib/airport/Common_Elements/Hangars/Sm_Gray_Hangar.agp',  box: [-6.0, 5.8, -11.3, -1.1], front: -90, frontName: 'Door' },
+      { id: 'hgr_sm_blue',  label: 'Small hangar, blue (12 × 10 m)',  path: 'lib/airport/Common_Elements/Hangars/Sm_Blue_Hangar.agp',  box: [-6.0, 5.8, -11.3, -1.1], front: -90, frontName: 'Door' },
+      { id: 'hgr_sm_brown', label: 'Small hangar, brown (12 × 10 m)', path: 'lib/airport/Common_Elements/Hangars/Sm_Brown_Hangar.agp', box: [-6.0, 5.8, -11.3, -1.1], front: -90, frontName: 'Door' },
+      { id: 'hgr_med_gray', label: 'Medium hangar, gray (44 × 27 m)', path: 'lib/airport/Common_Elements/Hangars/Med_Gray_Hangar.agp', box: [-20.7, 23.5, -28.7, -1.9] },
+      { id: 'hgr_eu_25',    label: 'Hangar (20 × 26 m)',    path: 'lib/airport/European_Airports/hangars/25x20x5.obj',      box: [-10.1, 10.1, -13.5, 12.5] },
+      { id: 'hgr_arch_30',  label: 'Arched hangar 30 × 30 m (X-Plane 12.2+)', path: 'lib/airport/hangars/arched/30x30/gray_1.obj', box: [-15.3, 15.3, -30.1, 0.1] },
+      { id: 'shed_tin',     label: 'Tin shed 10 × 30 m',  path: 'lib/g10/US/industrial/light/TinShed10x30Lt.obj',         box: [-5.3, 5.3, -15.2, 15.2] },
+      { id: 'shed_wood',    label: 'Wood shed 8 × 10 m',  path: 'lib/g10/US/industrial/light/WoodShed8x10.obj',           box: [-4.2, 4.2, -5.2, 5.2] },
     ]},
     { group: 'Fuel', items: [
-      { id: 'fuel_drums',   label: 'Fuel drums',          path: 'lib/g10/US/industrial/light/OilDrums.obj',               fp: [3, 3] },
-      { id: 'fuel_station', label: 'Small fuel station',  path: 'lib/airport/Common_Elements/Fueling_Stations/Small_Fuel_Station.obj', fp: [6, 4] },
+      { id: 'fuel_drums',   label: 'Fuel drums',          path: 'lib/g10/US/industrial/light/OilDrums.obj',               box: [-1.0, 1.0, -0.5, 0.3] },
+      { id: 'fuel_station', label: 'Small fuel station',  path: 'lib/airport/Common_Elements/Fueling_Stations/Small_Fuel_Station.obj', box: [-3.2, 3.2, -7.0, 0.5] },
       // v0.53: sizes measured from the models' vertices in Wayne's X-Plane 12 install (15-Nov-2026). "Sing_Tank_Small"
       // is a 14 m Jet A-1 storage tank (Wayne's XSBY test), so it's relabeled; real avgas pieces added.
-      { id: 'fuel_avgas_tank', label: 'Avgas tank, horizontal (2 × 9 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/tank_78_avgas_1.obj', fp: [2.2, 8.8] },
-      { id: 'fuel_avgas_stn',  label: 'Avgas station, tank + pump (3 × 8 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/station_small_avgas.obj', fp: [3.3, 7.5] },
-      { id: 'fuel_avgas_pump', label: 'Avgas 100LL pump',  path: 'lib/airport/Common_Elements/Fueling_Stations/fuel_station_white_avgas100LL.obj', fp: [1.8, 1.9] },
-      { id: 'fuel_tank',    label: 'Storage tank, large (14 m, Jet A-1)', path: 'lib/airport/Common_Elements/Fuel_Storage/Sing_Tank_Small.obj', fp: [13.8, 13.8] },
-      { id: 'fuel_truck',   label: 'Small fuel truck',    path: 'lib/airport/Common_Elements/vehicles/Small_Fuel_Truck.obj', fp: [3, 8] },
+      { id: 'fuel_avgas_tank', label: 'Avgas tank, horizontal (2 × 9 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/tank_78_avgas_1.obj', box: [-1.1, 1.1, -3.8, 5.0] },
+      { id: 'fuel_avgas_stn',  label: 'Avgas station, tank + pump (3 × 8 m)', path: 'lib/airport/Common_Elements/Fueling_Stations/station_small_avgas.obj', box: [-1.7, 1.7, -7.0, 0.5] },
+      { id: 'fuel_avgas_pump', label: 'Avgas 100LL pump',  path: 'lib/airport/Common_Elements/Fueling_Stations/fuel_station_white_avgas100LL.obj', box: [-1.0, 0.8, -1.1, 0.9] },
+      { id: 'fuel_tank',    label: 'Storage tank, large (14 m, Jet A-1)', path: 'lib/airport/Common_Elements/Fuel_Storage/Sing_Tank_Small.obj', box: [-6.8, 6.9, -6.8, 6.9] },
+      { id: 'fuel_truck',   label: 'Small fuel truck',    path: 'lib/airport/Common_Elements/vehicles/Small_Fuel_Truck.obj', box: [-1.6, 1.6, -8.4, 2.3] },
     ]},
     { group: 'Aircraft and vehicles', items: [
       // v0.54: prop_a.obj is a random pick (Wayne's X-Plane 12 library.txt: PA-28s, C172s and a BE58 Baron) — the "twin" at XSBY
-      { id: 'ac_prop',      label: 'Parked light aircraft (X-Plane picks: PA-28, C172 or Baron)', path: 'lib/airport/aircraft/general_aviation/prop_a.obj', fp: [11, 9] },
-      { id: 'ac_c172',      label: 'Parked Cessna 172',   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 fp: [11, 8], front: 0, frontName: 'Nose' },
-      { id: 'car',          label: 'Parked car',          path: 'lib/cars/car_static.obj',                                fp: [2, 5], front: 0, frontName: 'Front' },
+      { id: 'ac_prop',      label: 'Parked light aircraft (X-Plane picks: PA-28, C172 or Baron)', path: 'lib/airport/aircraft/general_aviation/prop_a.obj', box: [-6.0, 6.0, -3.0, 5.7] },
+      { id: 'ac_c172',      label: 'Parked Cessna 172',   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 box: [-6.0, 6.0, -3.0, 5.7], front: 0, frontName: 'Nose' },
+      { id: 'car',          label: 'Parked car',          path: 'lib/cars/car_static.obj',                                box: [-0.9, 0.9, -2.1, 2.1], front: 0, frontName: 'Front' },
     ]},
     { group: 'Other', items: [
-      { id: 'office',       label: 'Small office',        path: 'lib/airport/Common_Elements/Misc_Buildings/Small_Office_1.agp', fp: [12, 10] },
-      { id: 'site_office',  label: 'Site office 4 × 14 m', path: 'lib/g10/US/industrial/light/SiteOffice4x14.obj',        fp: [4, 14] },
-      { id: 'potty',        label: 'Porta-potty',         path: 'lib/airport/Common_Elements/Miscellaneous/Porta_Potty_2.obj', fp: [2, 2] },
-      { id: 'picnic',       label: 'Picnic table',        path: 'lib/airport/Common_Elements/Miscellaneous/Picnic_Table.obj', fp: [2, 2] },
-      { id: 'flag',         label: 'Flagpole',            path: 'lib/airport/Common_Elements/Miscellaneous/Flagpole.obj',  fp: [1, 1] },
+      { id: 'office',       label: 'Small office (32 × 25 m)',        path: 'lib/airport/Common_Elements/Misc_Buildings/Small_Office_1.agp', box: [-21.0, 11.4, -16.0, 9.0] },
+      { id: 'site_office',  label: 'Site office 4 × 14 m', path: 'lib/g10/US/industrial/light/SiteOffice4x14.obj',        box: [-1.9, 2.8, -7.3, 7.9] },
+      { id: 'potty',        label: 'Porta-potty',         path: 'lib/airport/Common_Elements/Miscellaneous/Porta_Potty_2.obj', box: [-0.6, 0.6, -1.8, 0.6] },
+      { id: 'picnic',       label: 'Picnic table',        path: 'lib/airport/Common_Elements/Miscellaneous/Picnic_Table.obj', box: [-0.9, 0.9, -1.1, 1.1] },
+      { id: 'flag',         label: 'Flagpole',            path: 'lib/airport/Common_Elements/Miscellaneous/Flagpole.obj',  box: [-0.9, 1.0, -0.5, 1.6] },
     ]},
   ];
-  const BY_ID = {}; CATALOG.forEach(g => g.items.forEach(i => { BY_ID[i.id] = i; }));
+  const BY_ID = {}; CATALOG.forEach(g => g.items.forEach(i => { if (!i.box) i.box = [-2, 2, -2, 2]; i.fp = [i.box[1] - i.box[0], i.box[3] - i.box[2]]; BY_ID[i.id] = i; }));
 
   // ---------- small geodesy (meters, true degrees) ----------
   const R = 6371008.8, rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;

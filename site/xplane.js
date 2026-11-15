@@ -17,11 +17,14 @@
 
   // ---------- library objects offered (every path seen in Gateway airports' DSFs) ----------
   // fp = rough footprint in meters [width, depth] for the preview only (X-Plane uses the model's own size)
+  // front = where the object's door/nose points, in degrees from its X-Plane heading (v0.49). Estimated from Wayne's XASN
+  // screenshot (15-Nov-2026: small blue hangar, Cessna 172 and car all at heading 100): aircraft and car noses point along the
+  // heading; the small hangars' door is 90° left of it. Objects without front: not checked yet, so the app shows plain Hdg.
   const CATALOG = [
     { group: 'Hangars', items: [
-      { id: 'hgr_sm_gray',  label: 'Small hangar, gray',  path: 'lib/airport/Common_Elements/Hangars/Sm_Gray_Hangar.agp',  fp: [16, 14] },
-      { id: 'hgr_sm_blue',  label: 'Small hangar, blue',  path: 'lib/airport/Common_Elements/Hangars/Sm_Blue_Hangar.agp',  fp: [16, 14] },
-      { id: 'hgr_sm_brown', label: 'Small hangar, brown', path: 'lib/airport/Common_Elements/Hangars/Sm_Brown_Hangar.agp', fp: [16, 14] },
+      { id: 'hgr_sm_gray',  label: 'Small hangar, gray',  path: 'lib/airport/Common_Elements/Hangars/Sm_Gray_Hangar.agp',  fp: [16, 14], front: -90, frontName: 'Door' },
+      { id: 'hgr_sm_blue',  label: 'Small hangar, blue',  path: 'lib/airport/Common_Elements/Hangars/Sm_Blue_Hangar.agp',  fp: [16, 14], front: -90, frontName: 'Door' },
+      { id: 'hgr_sm_brown', label: 'Small hangar, brown', path: 'lib/airport/Common_Elements/Hangars/Sm_Brown_Hangar.agp', fp: [16, 14], front: -90, frontName: 'Door' },
       { id: 'hgr_med_gray', label: 'Medium hangar, gray', path: 'lib/airport/Common_Elements/Hangars/Med_Gray_Hangar.agp', fp: [24, 20] },
       { id: 'hgr_eu_25',    label: 'Hangar 25 × 20 m',    path: 'lib/airport/European_Airports/hangars/25x20x5.obj',      fp: [25, 20] },
       { id: 'hgr_arch_30',  label: 'Arched hangar 30 × 30 m (X-Plane 12.2+)', path: 'lib/airport/hangars/arched/30x30/gray_1.obj', fp: [30, 30] },
@@ -36,8 +39,8 @@
     ]},
     { group: 'Aircraft and vehicles', items: [
       { id: 'ac_prop',      label: 'Parked single (generic)', path: 'lib/airport/aircraft/general_aviation/prop_a.obj',     fp: [11, 8] },
-      { id: 'ac_c172',      label: 'Parked Cessna 172',   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 fp: [11, 8] },
-      { id: 'car',          label: 'Parked car',          path: 'lib/cars/car_static.obj',                                fp: [2, 5] },
+      { id: 'ac_c172',      label: 'Parked Cessna 172',   path: 'lib/airport/aircraft/GA/Cessna_172.obj',                 fp: [11, 8], front: 0, frontName: 'Nose' },
+      { id: 'car',          label: 'Parked car',          path: 'lib/cars/car_static.obj',                                fp: [2, 5], front: 0, frontName: 'Front' },
     ]},
     { group: 'Other', items: [
       { id: 'office',       label: 'Small office',        path: 'lib/airport/Common_Elements/Misc_Buildings/Small_Office_1.agp', fp: [12, 10] },

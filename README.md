@@ -13,3 +13,7 @@ taxiways for ForeFlight (User Map Layers). Not for navigation.
 
 With thanks to [airports.robrc.net](https://airports.robrc.net/), whose public directory of Mexican airport
 infrastructure showed the way to AFAC's data.
+
+## X-Plane scenery (step 6, from v0.35)
+
+`site/xplane.js` builds an X-Plane 12 custom-scenery zip in the browser: `<ID> <Name>/Earth nav data/apt.dat` (APT.DAT 1200) plus, when objects from X-Plane's library are placed on the ramp, an overlay DSF. No server function or outside service is involved.

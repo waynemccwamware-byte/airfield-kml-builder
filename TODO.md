@@ -23,7 +23,16 @@ Open items from v0.1:
 - Mexican Airport System XLSX (AIP airports) not used yet.
 - Add a row to the Control Panel's Open Counts page if/when the app goes on the Control Panel.
 
-## X-Plane airport export (on hold, 14-Nov-2026)
+## X-Plane airport export — LIVE in v0.35 (15-Nov-2026)
+- Step 6 (collapsed by default): site/xplane.js writes apt.dat 1200 (runway from AFAC numbers/width/surface, ramp + taxiway
+  pavement from OSM, boundary = airfield box, windsock, tie-downs, AFAC elevation, city/state/country/local_code/region_code)
+  and, if objects are placed, an overlay DSF (library objects, sim/filter/aptid = the ID; byte-identical to WED 2.5.2r1 for
+  Wayne's XMM000J object). Default ID X+AFAC code (XSQA). Wayne loaded the SQA sample in X-Plane 12 on 15-Nov-2026: all good.
+- Not yet tried: WED File → Import apt.dat / Import DSF round trip.
+- Open: ATC taxi network (1200/1201/1202), exclusion zones, beacon, real model footprints/door directions,
+  "already on the Gateway?" check (gateway.x-plane.com API — verify before use), OSM hangars → hangar objects.
+
+### Background (14-Nov-2026)
 - Idea: generate an apt.dat 1200 scenery pack (zip: "<ID> <Name>/Earth nav data/apt.dat") from the same runway/ramp/taxi geometry:
   row 1 header (elev ft, ID, name), row 100 runway (surface 1 asphalt / 2 concrete / 3 grass / 4 dirt / 5 gravel), 110–116 pavement, 1302 metadata, 19 windsock, 1300 tie-down.
 - Use: drop into Custom Scenery to fly, or WED File → Import apt.dat → refine → validate → Export to Gateway.

@@ -15,6 +15,7 @@ const zlib = require('zlib');
 const AFAC_URL = process.env.AFAC_XLSX_URL ||
   'https://www.gob.mx/cms/uploads/attachment/file/1093964/aerodromo-helipuertos-pub-290726.xlsx';
 
+let lastHeaders = [];   // v0.60: header texts of the AFAC sheet, listed in source.columns (to see what AFAC does and doesn't publish)
 let cache = null;          // { at, body } — kept while the function instance stays warm
 const TTL_MS = 6 * 3600 * 1000;
 
@@ -90,6 +91,7 @@ function toRecords(rows) {
     if (h === 'NOMBRE') cols[cols.name ? 'owner' : 'name'] = c;
     else cols[h] = c;
   }
+  lastHeaders = order.map(c => String(rows[hi][c] || '').trim()).filter(Boolean);
   const g = (r, key) => (cols[key] && r[cols[key]]) || '';
   const pick = (r, ...keys) => { for (const k of keys) { const v = g(r, k); if (v) return v; } return ''; };
   const latKeys = Object.keys(cols).filter(k => k.startsWith('LATITUD'));
@@ -155,7 +157,7 @@ exports.handler = async (event) => {
       const buf = Buffer.from(await res.arrayBuffer());
       const records = toRecords(readSheet(unzip(buf)));
       const source = { name: 'AFAC — Aeródromos y helipuertos (gob.mx)', url: AFAC_URL, edition: editionFromUrl(AFAC_URL),
-                       fetched: new Date().toISOString(), rows: records.length };
+                       fetched: new Date().toISOString(), rows: records.length, columns: lastHeaders };
       const runways = records.filter(r => !NO_RUNWAY.test(norm(r.type)));
       cache = {
         at: Date.now(),

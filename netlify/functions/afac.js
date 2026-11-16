@@ -6,8 +6,8 @@
 // XLSX, unzips it with Node's built-in zlib (no npm packages: App Conventions §1, no build step) and
 // returns one compact record per row.
 //
-// AFAC_URL: the edition is in the file name (pub-290726 = 29-Jul-2026). When AFAC posts a new edition the
-// attachment number changes too, so update AFAC_URL (or set the AFAC_XLSX_URL environment variable in
+// AFAC_URL (fallback since v0.60, see latestUrl): the edition is in the file name (pub-290726 = 29-Jul-2026). When AFAC posts a new edition the
+// attachment number changes too; latestUrl() reads it from AFAC's page (or set the AFAC_XLSX_URL environment variable in
 // Netlify). There is no stable "latest" link that we know of (checked 14-Nov-2026).
 
 const zlib = require('zlib');
@@ -15,6 +15,26 @@ const zlib = require('zlib');
 const AFAC_URL = process.env.AFAC_XLSX_URL ||
   'https://www.gob.mx/cms/uploads/attachment/file/1093964/aerodromo-helipuertos-pub-290726.xlsx';
 
+let lastHeaders = [];   // v0.60: header texts of the AFAC sheet, listed in source.columns (to see what AFAC does and doesn't publish)
+// v0.60: AFAC's page links the newest edition; read the link from it so new editions are picked up without a code
+// change (Wayne found the 28-Sep-2026 edition while the app still read 29-Jul-2026). AFAC_URL is the fallback.
+const AFAC_PAGE = 'https://www.gob.mx/afac/acciones-y-programas/base-de-datos-de-aerodromos-y-helipuertos';
+async function latestUrl() {
+  if (process.env.AFAC_XLSX_URL) return AFAC_URL;
+  try {
+    const res = await fetch(AFAC_PAGE, { headers: { 'User-Agent': 'Mozilla/5.0 (GeezerGeekPilot-AirfieldKML)', 'Accept': 'text/html' } });
+    if (!res.ok) return AFAC_URL;
+    const html = await res.text();
+    const links = [...html.matchAll(/(?:https:\/\/www\.gob\.mx)?\/cms\/uploads\/attachment\/file\/\d+\/[^"'\s<>]*?\.xlsx/gi)].map(m => m[0])
+      .filter(u => /aerodromo/i.test(u));
+    if (!links.length) return AFAC_URL;
+    // newest by the pub-DDMMYY date in the file name
+    const key = u => { const m = u.match(/pub-(\d{2})(\d{2})(\d{2})/); return m ? m[3] + m[2] + m[1] : ''; };
+    links.sort((a, b) => key(b).localeCompare(key(a)));
+    const u = links[0];
+    return u.startsWith('http') ? u : 'https://www.gob.mx' + u;
+  } catch (e) { return AFAC_URL; }
+}
 let cache = null;          // { at, body } — kept while the function instance stays warm
 const TTL_MS = 6 * 3600 * 1000;
 
@@ -90,6 +110,7 @@ function toRecords(rows) {
     if (h === 'NOMBRE') cols[cols.name ? 'owner' : 'name'] = c;
     else cols[h] = c;
   }
+  lastHeaders = order.map(c => String(rows[hi][c] || '').trim()).filter(Boolean);
   const g = (r, key) => (cols[key] && r[cols[key]]) || '';
   const pick = (r, ...keys) => { for (const k of keys) { const v = g(r, k); if (v) return v; } return ''; };
   const latKeys = Object.keys(cols).filter(k => k.startsWith('LATITUD'));
@@ -150,12 +171,13 @@ exports.handler = async (event) => {
   const all = event && event.queryStringParameters && event.queryStringParameters.all === '1';
   try {
     if (!cache || Date.now() - cache.at > TTL_MS) {
-      const res = await fetch(AFAC_URL, { headers: { 'User-Agent': 'GeezerGeekPilot-AirfieldKML/0.1' } });
+      const url = await latestUrl();
+      const res = await fetch(url, { headers: { 'User-Agent': 'GeezerGeekPilot-AirfieldKML/0.1' } });
       if (!res.ok) throw new Error(`AFAC download failed: HTTP ${res.status}`);
       const buf = Buffer.from(await res.arrayBuffer());
       const records = toRecords(readSheet(unzip(buf)));
-      const source = { name: 'AFAC — Aeródromos y helipuertos (gob.mx)', url: AFAC_URL, edition: editionFromUrl(AFAC_URL),
-                       fetched: new Date().toISOString(), rows: records.length };
+      const source = { name: 'AFAC — Aeródromos y helipuertos (gob.mx)', url, edition: editionFromUrl(url), page: AFAC_PAGE, found: url !== AFAC_URL,
+                       fetched: new Date().toISOString(), rows: records.length, columns: lastHeaders };
       const runways = records.filter(r => !NO_RUNWAY.test(norm(r.type)));
       cache = {
         at: Date.now(),

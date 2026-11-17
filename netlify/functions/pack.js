@@ -113,9 +113,9 @@ exports.handler = async (event) => {
     const name = String(q.n || 'airfield').replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 40) || 'airfield';
     const files = [];
     for (const [path, text] of Object.entries(obj)){
-      // only what a content pack holds: manifest.json, layers/*.kml, navdata/*.kml|*.txt|*.html (v0.64) — all under <name>/
+      // only what a content pack holds: manifest.json, layers/*.kml, navdata/*.kml|*.txt|*.html (v0.64)|*.pdf (v0.66, ASCII-only) — all under <name>/
       // with or without the pack folder on top (ForeFlight's own packs come both ways)
-      if (!new RegExp(`^(${name}/)?(manifest\\.json|layers/[^/]+\\.kml|navdata/[^/]+\\.(kml|txt|html))$`).test(path)) throw new Error('unexpected file ' + path);
+      if (!new RegExp(`^(${name}/)?(manifest\\.json|layers/[^/]+\\.kml|navdata/[^/]+\\.(kml|txt|html|pdf))$`).test(path)) throw new Error('unexpected file ' + path);
       if (typeof text !== 'string') throw new Error('bad file ' + path);
       if (/\.kml$/.test(path) && !/^<\?xml[\s\S]*<kml[\s>]/.test(text)) throw new Error('not a KML document: ' + path);
       files.push([path, text]);

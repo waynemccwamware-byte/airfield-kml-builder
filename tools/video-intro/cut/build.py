@@ -14,7 +14,7 @@ def ff(args): subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'erro
 KB = lambda D, z0=1.0, z1=1.08, cx=0.5, cy=0.5: (f"scale=3840:2160:force_original_aspect_ratio=increase,crop=3840:2160,"
      f"zoompan=z='{z0}+({z1}-{z0})*on/{int(D*FPS)}':x='iw*{cx}-iw/zoom/2':y='ih*{cy}-ih/zoom/2':d=1:s={W}x{H}:fps={FPS}")
 
-def render(i, D, video, vo=None, vo_at=0.0, natural=None, overlays=()):
+def render(i, D, video, vo=None, vo_at=0.0, vo_ss=0.0, natural=None, overlays=()):
     """video: (kind, ...) ; overlays: [(png, t_in, t_out)] ; natural: (src, ss, gain_db) for location sound"""
     inp, fc = [], []
     k = video[0]
@@ -48,7 +48,7 @@ def render(i, D, video, vo=None, vo_at=0.0, natural=None, overlays=()):
         inp += ['-ss', str(ss), '-t', f'{D:.3f}', '-i', src]
         fc.append(f"[{na}:a]aresample=48000,aformat=channel_layouts=stereo,volume={g}dB,afade=t=in:d=0.3,afade=t=out:st={max(0, D - 0.5)}:d=0.5[nat]"); aparts.append('[nat]'); na += 1
     if vo:
-        inp += ['-i', str(VO / f'{vo}.m4a')]
+        inp += ['-ss', f'{vo_ss:.3f}', '-i', str(VO / f'{vo}.m4a')]
         ms = int(vo_at * 1000)
         fc.append(f"[{na}:a]aresample=48000,aformat=channel_layouts=stereo,adelay={ms}|{ms}[vo]"); aparts.append('[vo]'); na += 1
     inp += ['-f', 'lavfi', '-t', f'{D:.3f}', '-i', 'anullsrc=r=48000:cl=stereo']
@@ -67,9 +67,14 @@ def plan():
     d = vod('s1-b'); P.append(dict(D=d + L + 0.6, video=('still', PH['sunset'], 1.0, 1.10, 0.5, 0.6), vo='s1-b', vo_at=L, overlays=[(G / 'title.png', 0.3, d + L + 0.6)], tag='s1-b title'))
     d = vod('s1-c'); P.append(dict(D=d + L + 0.3, video=('clip', LAND, 4.0, f"zoompan=z='1+0.75*in/{int((d+L+0.3)*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.70-ih/zoom/2':d=1:s=1280x720:fps={FPS}"), vo='s1-c', vo_at=L, tag='s1-c ForeFlight PiP'))
     d = vod('s1-d'); D = d + L + 0.4
-    P.append(dict(D=7.6, video=('still', PH['clinic'], 1.0, 1.08, 0.5, 0.5), vo='s1-d', vo_at=L, tag='s1-d clinic'))
-    P.append(dict(D=5.6, video=('still', PH['mission'], 1.0, 1.08, 0.5, 0.45), tag='s1-d mission'))
-    P.append(dict(D=D - 13.2, video=('still', PH['mountain'], 1.0, 1.08, 0.5, 0.45), overlays=[(G / 'cap-robrc.png', 0.3, D - 13.2)], tag='s1-d mountain + robrc'))
+    RA, RB = CAP / 'robrc-a.mp4', CAP / 'robrc-b.mp4'
+    cuts = [0, 3.0, 9.8, 12.6, 17.2, D]      # mission | clinic | mountain | robrc search | robrc row (segment seconds)
+    shots = [('still', PH['mission'], 1.0, 1.08, 0.5, 0.45), ('still', PH['clinic'], 1.0, 1.08, 0.5, 0.5), ('still', PH['mountain'], 1.0, 1.08, 0.5, 0.45), ('cap', RA, ''), ('cap', RB, '')]
+    names = ['mission', 'clinic', 'mountain', 'robrc.net search', 'robrc.net SQA row']
+    for j in range(5):
+        a, b = cuts[j], cuts[j + 1]
+        ov = [(G / 'cap-robrc.png', 0.2 if j == 3 else 0.0, b - a + (0.0 if j == 4 else 0.4))] if j >= 3 else []
+        P.append(dict(D=b - a, video=shots[j], vo='s1-d', vo_at=max(0, L - a), vo_ss=max(0, a - L), overlays=ov, tag=f's1-d {names[j]}'))
     for n, extra in (('s2-a', []), ('s2-b', [(G / 'to-rcx.png', 0.3, 5.5)]), ('s2-c', [])):
         P.append(dict(D=dur(CAP / f'{n}.mp4'), video=('cap', CAP / f'{n}.mp4', ''), vo=n, overlays=extra, tag=n))
     d = vod('s2-d'); P.append(dict(D=d + L + 0.4, video=('still', str(G / 'ph-ff-install.png'), 1, 1, .5, .5), vo='s2-d', vo_at=L, tag='s2-d PLACEHOLDER'))
@@ -83,23 +88,15 @@ def plan():
     D = dur(CAP / 's4-a.mp4'); P.append(dict(D=D, video=('cap', CAP / 's4-a.mp4', f"zoompan=z='1+0.32*in/{int(D*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.60-ih/zoom/2':d=1:s={W}x{H}:fps={FPS}"), vo='s4-a', tag='s4-a caution'))
     d = vod('s4-b')
     P.append(dict(D=7.0, video=('clip', TKOF, 0.0, ''), natural=(TKOF, 0.0, -8), vo='s4-b', vo_at=L, tag='s4-b takeoff'))
-    P.append(dict(D=d + L - 7.0 + 4.0, video=('still', PH['sunset'], 1.06, 1.0, 0.5, 0.6), overlays=[(G / 'end.png', 0.2, d + L - 7.0 + 4.0)], tag='end card', vo='s4b-tail', vo_at=0))
+    P.append(dict(D=d + L - 7.0 + 4.0, video=('still', PH['sunset'], 1.06, 1.0, 0.5, 0.6), overlays=[(G / 'end.png', 0.2, d + L - 7.0 + 4.0)], tag='end card', vo='s4-b', vo_ss=7.0 - L, vo_at=0))
     return P
 
 if __name__ == '__main__':
     P = plan()
-    # the end card carries the rest of s4-b: split the take at 7.0 - L seconds
-    d = vod('s4-b'); cut = 7.0 - 0.4
-    ff(['-i', str(VO / 's4-b.m4a'), '-ss', f'{cut}', '-c:a', 'aac', '-b:a', '192k', str(VO / 's4b-tail.m4a')])
-    ff(['-i', str(VO / 's4-b.m4a'), '-t', f'{cut}', '-c:a', 'aac', '-b:a', '192k', '/tmp/s4b-head.m4a'])
-    import shutil
     only = set(sys.argv[1:])
     t, segs, marks = 0.0, [], []
     for i, s in enumerate(P):
-        if s['vo'] == 's4-b' if 'vo' in s else False: pass
-        args = {k: s[k] for k in ('vo', 'vo_at', 'natural', 'overlays') if k in s}
-        if args.get('vo') == 's4-b':   # takeoff segment gets only the head of s4-b
-            shutil.copy('/tmp/s4b-head.m4a', VO / 's4b-head.m4a'); args['vo'] = 's4b-head'
+        args = {k: s[k] for k in ('vo', 'vo_at', 'vo_ss', 'natural', 'overlays') if k in s}
         if not only or str(i) in only:
             render(i, s['D'], s['video'], **args)
         segs.append(SEG / f'{i:02d}.mp4'); marks.append((round(t, 2), s['tag'])); t += s['D']
@@ -111,5 +108,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v1.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v2.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

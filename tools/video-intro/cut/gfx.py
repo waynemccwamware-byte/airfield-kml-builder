@@ -66,7 +66,16 @@ def endcard(url):
     d.text((x, 820), "For planning and simulation only. Check an airstrip's status before you go.", font=F(400, 30), fill=MUTED)
     im.save(D / 'end.png')
 
+def tag(name, a, b):
+    im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    for x0, txt, col in ((40, a, MUTED), (W // 2 + 40, b, AMBER)):
+        w = d.textlength(txt, font=F(600, 38, True))
+        d.rounded_rectangle([x0, 40, x0 + w + 48, 104], radius=14, fill=(12, 15, 20, 215))
+        d.text((x0 + 24, 72), txt, font=F(600, 38, True), fill=col, anchor='lm')
+    im.save(D / f'tag-{name}.png')
+
 if __name__ == '__main__':
+    tag('beforenow', 'BEFORE · hand-typed waypoint', 'NOW · SQA_AFAC')
     textover('xsqa', 'XSQA', 'San Pedro de la Cueva, Sonora')
     textover('rcx', 'RCX', 'Laguna San Ignacio, Baja Sur')
     textover('xsby', 'XSBY', 'San Juanico (Scorpion Bay), Baja Sur')

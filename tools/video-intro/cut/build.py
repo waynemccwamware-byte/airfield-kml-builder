@@ -123,8 +123,10 @@ def plan():
     for n, extra in (('s3-a', [(G / 'to-xsby.png', 2.8, 7.4)]), ('s3-b', []), ('s3-c', []), ('s3-d', []), ('s3-e', []), ('s3-f', [])):
         P.append(dict(D=dur(CAP / f'{n}.mp4'), video=('cap', CAP / f'{n}.mp4', ''), vo=n, overlays=extra, tag=n))
     d = vod('s3-g'); P.append(dict(D=6.0 + d + 0.6, video=('still', str(G / 'ph-xsby-land.png'), 1, 1, .5, .5), vo='s3-g', vo_at=6.0, tag='s3-g PLACEHOLDER (sim)'))
-    P.append(dict(D=5.5, video=('split', LAND, 131.5, str(G / 'ph-xsqa-final.png')), natural=(LAND, 131.5, -18), tag='split real/XSQA'))
-    D = dur(CAP / 's4-a.mp4'); P.append(dict(D=D, video=('cap', CAP / 's4-a.mp4', f"zoompan=z='1+0.32*in/{int(D*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.60-ih/zoom/2':d=1:s={W}x{H}:fps={FPS}"), vo='s4-a', tag='s4-a caution'))
+    # caution VO starts on the split ("…in real life or on the sim"), cuts to the app's disclaimer at the pause after "sim"
+    CUT = 8.5
+    P.append(dict(D=L + CUT, video=('split', LAND, 131.5, str(G / 'ph-xsqa-final.png')), natural=(LAND, 131.5, -22), vo='s4-a', vo_at=L, tag='split real/XSQA + caution VO'))
+    D = vod('s4-a') - CUT + 1.0; P.append(dict(D=D, video=('cap', CAP / 's4-a.mp4', f"zoompan=z='1+0.32*in/{int(D*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.60-ih/zoom/2':d=1:s={W}x{H}:fps={FPS}"), vo='s4-a', vo_ss=CUT, vo_at=0, tag='s4-a caution'))
     d = vod('s4-b')
     P.append(dict(D=7.0, video=('clip', TKOF, 0.0, ''), natural=(TKOF, 0.0, -20), vo='s4-b', vo_at=L, tag='s4-b takeoff'))
     card = d + L - 7.0 + 4.0 + 1.5        # card holds 4 s after the last word, then a 1.5 s soft fade
@@ -149,5 +151,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v8.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v9.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

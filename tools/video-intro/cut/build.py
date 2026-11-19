@@ -113,7 +113,8 @@ def plan():
     # teaser: the 3-D view with both visual approaches, a slow turn (music only)
     P.append(dict(D=dur(CAP / 'teaser-3d.mp4'), video=('cap', CAP / 'teaser-3d.mp4', ''), overlays=[(G / 'new-3d.png', 0.3, dur(CAP / 'teaser-3d.mp4'))], tag='3-D teaser (new)'))
     d = vod('s2-d'); D = d + L + 0.4
-    P.append(dict(D=D, video=('seq', FFREC, [(1.1, 5.0, 3.9), (5.0, 5.7, 0.7), (10.4, 16.2, 3.8), (20.6, 26.2, 5.6), (26.5, 26.5 + D - 14.0, D - 14.0)]), vo='s2-d', vo_at=L, tag='s2-d ForeFlight install + layers'))
+    P.append(dict(D=D, video=('seq', FFREC, [(1.1, 5.0, 3.9), (5.0, 5.7, 0.7), (10.4, 16.2, 3.8), (20.6, 26.2, 5.6), (26.5, 26.5 + D - 14.0, D - 14.0)]), vo='s2-d', vo_at=L,
+                  overlays=[(G / 'spot-ff-open.png', 2.0, 3.8, 0.3)], tag='s2-d ForeFlight install + layers'))   # spotlight on "tap Open in ForeFlight"
     d = vod('s2-e'); D = d + L + 0.4
     # tap SQA_AFAC -> route draws -> (briefly, 1.5x) drag the route onto the left downwind's midfield dot, Insert into Route
     P.append(dict(D=D, video=('seq', FFREC, [(27.8, 29.5, 2.5), (29.5, 31.0, 1.5), (33.4, 37.4, D - 4.0)]), vo='s2-e', vo_at=L, tag='s2-e ForeFlight flight plan + downwind'))
@@ -148,5 +149,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v7.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v8.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

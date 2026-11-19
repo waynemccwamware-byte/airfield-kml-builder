@@ -86,7 +86,21 @@ def newlabel(name, rest, head='NEW'):
     d.text((x + 30 + w1 + 26, y + ph / 2), rest, font=f2, fill=TEXT, anchor='lm')
     im.save(D / f'new-{name}.png')
 
+def spotring(name, box, pad=12):
+    """amber spotlight like the app captures: ring with glow, everything else dimmed a little"""
+    x0, y0, x1, y1 = box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad
+    im = Image.new('RGBA', (W, H), (8, 10, 14, 82))
+    hole = Image.new('L', (W, H), 255); ImageDraw.Draw(hole).rounded_rectangle([x0, y0, x1, y1], radius=17, fill=0)
+    im.putalpha(Image.fromarray(__import__('numpy').minimum(__import__('numpy').array(im.getchannel('A')), __import__('numpy').array(hole))))
+    glow = Image.new('RGBA', (W, H), (0, 0, 0, 0)); ImageDraw.Draw(glow).rounded_rectangle([x0, y0, x1, y1], radius=17, outline=(245, 166, 35, 150), width=14)
+    glow = glow.filter(ImageFilter.GaussianBlur(10)); im = Image.alpha_composite(im, glow)
+    ImageDraw.Draw(im).rounded_rectangle([x0, y0, x1, y1], radius=17, outline=AMBER + (255,), width=5)
+    im.save(D / f'spot-{name}.png')
+
 if __name__ == '__main__':
+    # Open in ForeFlight in Wayne's iPad recording: rec px (475,1322)-(760,1400), scaled 1080/1488 and centered (x + 137.5)
+    k, ox = 1080 / 1488, (1920 - 2266 * 1080 / 1488) / 2
+    spotring('ff-open', (ox + 475 * k, 1322 * k, ox + 760 * k, 1400 * k))
     newlabel('3d', '3D map view and visual approaches', 'Teaser:')
     tag('beforenow', 'BEFORE · hand-typed waypoint', 'NOW · SQA_AFAC')
     textover('xsqa', 'XSQA', 'San Pedro de la Cueva, Sonora')

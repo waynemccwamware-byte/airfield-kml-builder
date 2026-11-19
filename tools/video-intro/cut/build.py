@@ -5,13 +5,13 @@ VO = pathlib.Path('/home/claude/airfield-kml-builder/tools/video-intro/vo')
 MUSIC = '/home/claude/vref/piston-ga-stats/tools/video-safety/music/ende-ambient-acoustic-guitars-vol-1.mp3'
 SEG = pathlib.Path('/home/claude/cut/seg'); SEG.mkdir(exist_ok=True)
 LAND = str(U / 'SPdlC-landing.mp4'); FFREC = str(U / 'ScreenRecording_11-18-2026_08-49-19_1.mp4'); TAXI = str(U / '868e5326-taxi-out.mp4'); TKOF = str(U / '94915a95-takeoff.mp4')
-PH = {'clinic': '/home/claude/out/free-clinic-blurred.jpg', 'mission': str(U / '42918236-image.jpg'), 'sunset': str(U / 'bc10abd3-image.jpg'), 'mountain': '/home/claude/cut/mountain.jpg'}
+PH = {'clinic': '/home/claude/out/free-clinic-blurred.jpg', 'gil': '/home/claude/out/clinic-gil-blurred.jpg', 'eric': str(U / '60257839-image.jpg'), 'aimee': '/home/claude/out/clinic-aimee-blurred.jpg', 'mission': str(U / '42918236-image.jpg'), 'sunset': str(U / 'bc10abd3-image.jpg'), 'mountain': '/home/claude/cut/mountain.jpg'}
 W, H, FPS = 1920, 1080, 30
 def dur(f): return float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(f)], capture_output=True, text=True).stdout)
 def vod(n): return dur(VO / f'{n}.m4a')
 def ff(args): subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', *args], check=True)
 
-KB = lambda D, z0=1.0, z1=1.08, cx=0.5, cy=0.5: (f"scale=3840:2160:force_original_aspect_ratio=increase,crop=3840:2160,"
+KB = lambda D, z0=1.0, z1=1.08, cx=0.5, cy=0.5: (f"scale=3840:2160:force_original_aspect_ratio=increase,crop=3840:2160:(iw-3840)*{cx}:(ih-2160)*{cy},"
      f"zoompan=z='{z0}+({z1}-{z0})*on/{int(D*FPS)}':x='iw*{cx}-iw/zoom/2':y='ih*{cy}-ih/zoom/2':d=1:s={W}x{H}:fps={FPS}")
 
 def render(i, D, video, vo=None, vo_at=0.0, vo_ss=0.0, natural=None, overlays=()):
@@ -48,6 +48,15 @@ def render(i, D, video, vo=None, vo_at=0.0, vo_ss=0.0, natural=None, overlays=()
         inp += ['-ss', str(lt), '-t', f'{D:.3f}', '-i', land, '-ss', str(rt), '-t', f'{D:.3f}', '-i', rec]
         fc.append(f"[0:v]crop=290:400:495:320,scale=-2:{H},pad={W//2}:{H}:(ow-iw)/2:0:color=0x10141a,fps={FPS},setsar=1[l];"
                   f"[1:v]crop=1000:1125:760:280,scale={W//2}:{H},fps={FPS},setsar=1[r];[l][r]hstack=2,format=yuv420p[v0]")
+    elif k == 'montage':   # ('montage', [(img, cx, cy), ...]) stills crossfading one to the next, each with a gentle push-in
+        _, imgs = video; xf = 0.4; n = len(imgs); d1 = (D + (n - 1) * xf) / n
+        for j, (img, cx, cy) in enumerate(imgs):
+            inp += ['-loop', '1', '-framerate', str(FPS), '-t', f'{d1:.3f}', '-i', img]
+            fc.append(f"[{j}:v]{KB(d1, 1.0, 1.06, cx, cy)},setsar=1,format=yuv420p[m{j}]")
+        last_m = 'm0'
+        for j in range(1, n):
+            fc.append(f"[{last_m}][m{j}]xfade=transition=fade:duration={xf}:offset={j * (d1 - xf):.3f}[x{j}]"); last_m = f'x{j}'
+        fc.append(f"[{last_m}]trim=duration={D:.3f},format=yuv420p[v0]")
     elif k == 'split':   # real clip left, placeholder right
         _, src, ss, ph = video
         inp += ['-ss', str(ss), '-t', f'{D:.3f}', '-i', src, '-loop', '1', '-t', f'{D:.3f}', '-i', ph]
@@ -87,9 +96,11 @@ def plan():
     P.append(dict(D=D, video=('clipcat', LAND, [(0.4, 9.7), (19.6, 19.6 + D - 9.3)], f"zoompan=z='1+0.75*in/{int(D*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.73-ih/zoom/2':d=1:s=1280x720:fps={FPS}"), vo='s1-c', vo_at=L, tag='s1-c ForeFlight PiP'))
     d = vod('s1-d'); D = d + L + 0.4
     RA, RB = CAP / 'robrc-a.mp4', CAP / 'robrc-b.mp4'
-    cuts = [0, 3.0, 9.8, 12.6, 17.2, D]      # mission | clinic | mountain | robrc search | robrc row (segment seconds)
-    shots = [('still', PH['mission'], 1.0, 1.08, 0.5, 0.45), ('still', PH['clinic'], 1.0, 1.08, 0.5, 0.5), ('still', PH['mountain'], 1.0, 1.08, 0.5, 0.45), ('cap', RA, ''), ('cap', RB, '')]
-    names = ['mission', 'clinic', 'mountain', 'robrc.net search', 'robrc.net SQA row']
+    cuts = [0, 2.6, 10.0, 12.6, 17.2, D]   # mission | clinic montage | posada and mountain | robrc search | robrc row
+    shots = [('still', PH['mission'], 1.0, 1.08, 0.5, 0.45),
+             ('montage', [(PH['gil'], 0.5, 0.55), (PH['eric'], 0.45, 0.45), (PH['aimee'], 0.5, 0.22), (PH['clinic'], 0.5, 0.5)]),
+             ('still', PH['mountain'], 1.0, 1.06, 0.5, 0.45), ('cap', RA, ''), ('cap', RB, '')]
+    names = ['mission', 'clinic montage', 'posada and mountain', 'robrc.net search', 'robrc.net SQA row']
     for j in range(5):
         a, b = cuts[j], cuts[j + 1]
         ov = [(G / 'cap-robrc.png', 0.2 if j == 3 else 0.0, b - a + (0.0 if j == 4 else 0.4))] if j >= 3 else []
@@ -129,5 +140,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v3.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v4.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

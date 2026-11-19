@@ -25,6 +25,12 @@ def route(r):
             return r.fulfill(status=200, content_type='application/javascript', body=body)
         ct = 'text/css' if f.suffix == '.css' else 'application/javascript' if f.suffix == '.js' else 'image/png'
         return r.fulfill(path=str(f), content_type=ct)
+    if 'cdn.jsdelivr.net/npm/three@0.128.0/' in u:   # three.js r128 from npm; OrbitControls exposes the camera for filming
+        f = NM / 'three' / u.split('three@0.128.0/')[1].split('?')[0]
+        body = f.read_text()
+        if f.name == 'OrbitControls.js':
+            body += ";(function(){const O=THREE.OrbitControls;THREE.OrbitControls=function(c,d){const o=new O(c,d);window.__orbit=o;window.__cam=c;return o};THREE.OrbitControls.prototype=O.prototype;})();"
+        return r.fulfill(status=200, content_type='application/javascript', body=body)
     if any(h in u for h in ALLOW) or u.startswith('data:') or u.startswith('blob:'):
         return r.continue_()
     return r.abort()

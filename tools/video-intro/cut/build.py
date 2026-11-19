@@ -110,6 +110,8 @@ def plan():
         P.append(dict(D=b - a, video=shots[j], vo='s1-d', vo_at=max(0, L - a), vo_ss=max(0, a - L), overlays=ov, tag=f's1-d {names[j]}'))
     for n, extra in (('s2-a', []), ('s2-b', [(G / 'to-rcx.png', 0.3, 5.5)]), ('s2-c', [])):
         P.append(dict(D=dur(CAP / f'{n}.mp4'), video=('cap', CAP / f'{n}.mp4', ''), vo=n, overlays=extra, tag=n))
+    # teaser: the 3-D view with both visual approaches, a slow turn (music only)
+    P.append(dict(D=dur(CAP / 'teaser-3d.mp4'), video=('cap', CAP / 'teaser-3d.mp4', ''), overlays=[(G / 'new-3d.png', 0.3, dur(CAP / 'teaser-3d.mp4'))], tag='3-D teaser (new)'))
     d = vod('s2-d'); D = d + L + 0.4
     P.append(dict(D=D, video=('seq', FFREC, [(1.1, 5.0, 3.9), (5.0, 5.7, 0.7), (10.4, 16.2, 3.8), (20.6, 26.2, 5.6), (26.5, 26.5 + D - 14.0, D - 14.0)]), vo='s2-d', vo_at=L, tag='s2-d ForeFlight install + layers'))
     d = vod('s2-e'); D = d + L + 0.4
@@ -146,5 +148,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v5.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v6.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

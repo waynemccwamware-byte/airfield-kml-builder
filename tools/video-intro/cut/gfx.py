@@ -74,7 +74,18 @@ def tag(name, a, b):
         d.text((x0 + 24, 72), txt, font=F(600, 38, True), fill=col, anchor='lm')
     im.save(D / f'tag-{name}.png')
 
+def newlabel(name, rest, head='NEW'):
+    im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    f1, f2 = F(600, 42, True), F(500, 40)
+    w1 = d.textlength(head, font=f1); w2 = d.textlength(rest, font=f2)
+    x, y, ph = 64, H - 64 - 84, 84
+    d.rounded_rectangle([x, y, x + 64 + w1 + 26 + w2, y + ph], radius=16, fill=(12, 15, 20, 215))
+    d.text((x + 30, y + ph / 2), head, font=f1, fill=AMBER, anchor='lm')
+    d.text((x + 30 + w1 + 26, y + ph / 2), rest, font=f2, fill=TEXT, anchor='lm')
+    im.save(D / f'new-{name}.png')
+
 if __name__ == '__main__':
+    newlabel('3d', '3D map view and visual approaches', 'Teaser:')
     tag('beforenow', 'BEFORE · hand-typed waypoint', 'NOW · SQA_AFAC')
     textover('xsqa', 'XSQA', 'San Pedro de la Cueva, Sonora')
     textover('rcx', 'RCX', 'Laguna San Ignacio, Baja Sur')

@@ -53,7 +53,7 @@ def endcard(url):
     im.paste(qi, (W - 150 - 380, 300))
     d.text((W - 150 - 190, 720), 'GeezerGeek Pilot Apps (free)', font=F(600, 36), fill=AMBER, anchor='mm')
     for i, line in enumerate(('geezer-geek-pilot-control-panel', '.netlify.app')):   # the "link below" (Wayne)
-        d.text((W - 150 - 190, 772 + i * 40), line, font=F(500, 30, True), fill=TEXT, anchor='mm')
+        d.text((W - 150 - 190, 780 + i * 48), line, font=F(600, 40), fill=AMBER, anchor='mm')
     x = 160
     d.text((x, 260), "Mexican Airstrips", font=F(600, 72), fill=TEXT)
     d.text((x, 350), "for your EFB and Sim", font=F(500, 48), fill=AMBER)

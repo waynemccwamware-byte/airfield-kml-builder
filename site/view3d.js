@@ -150,8 +150,14 @@
             const o = new THREE.Mesh(new THREE.OctahedronGeometry(40), new THREE.MeshBasicMaterial({ color: 0xffb000 })); o.position.set(c[0], y, c[1]); over.add(o);
             over.add(label(`${v.id} ${Number.isInteger(m.d) ? m.d : m.d.toFixed(1)}NM ${fmt(m.alt)}'`, '#ffb000', c[0], y, c[1])); });
         }
-        if (v.pen != null){ const c = ptAt(v, v.pen); over.add(tube([[c[0], Y(hAt(c[0], c[1])), c[1]], [c[0], Y(altM(v, v.pen)) + 300, c[1]]], 0xe0705f, 18));
-          over.add(label(`terrain ${v.pen} NM`, '#ff8a75', c[0], Y(altM(v, v.pen)) + 300, c[1])); }
+        // v0.78: a red post on the actual high point, from the ground (mesh) up to that terrain's height, labeled with the
+        // clearance; a thin red line from its top to the path shows the gap
+        if (v.warn){ const H = toXZ(v.warn.p), top = v.warn.terrFt / FT, g = hAt(H[0], H[1]), c = ptAt(v, v.warn.d), pathY = Y(altM(v, v.warn.d));
+          over.add(tube([[H[0], Y(Math.min(g, top)) - 5, H[1]], [H[0], Y(Math.max(g, top)) + 40, H[1]]], 0xe0705f, 18));
+          over.add(tube([[H[0], Y(top), H[1]], [c[0], pathY, c[1]]], 0xe0705f, 4));
+          over.add(label(v.warn.c >= 0 ? `terrain ${v.warn.d} NM · ${fmt(r10(v.warn.c))}' below path` : `terrain ${v.warn.d} NM · ${fmt(r10(-v.warn.c))}' above path`, '#ff8a75', H[0], Y(Math.max(g, top)) + 60, H[1])); }
+        if (v.pen != null){ const c = ptAt(v, v.pen), g = hAt(c[0], c[1]); over.add(tube([[c[0], Y(g) - 5, c[1]], [c[0], Y(g) + 150, c[1]]], 0xe0705f, 18));
+          over.add(label(`terrain ${v.pen} NM: line ends`, '#ff8a75', c[0], Y(g) + 170, c[1])); }
       });
     }
 

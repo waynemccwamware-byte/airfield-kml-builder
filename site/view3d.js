@@ -1,4 +1,4 @@
-/* Mexican Airstrips for your EFB and Sim — v0.72: 3-D view (Wayne, 19-Nov-2026, from the approved SQA mockup).
+/* Mexican Airstrips for your EFB and Sim — v0.72: 3-D view (v0.77: pattern drawn without AFAC elevation, TPA from the terrain model) (Wayne, 19-Nov-2026, from the approved SQA mockup).
    Loaded only when "3-D view" is tapped. Terrain ±20 NM around the runway midpoint from Terrain Tiles on AWS (z12,
    through netlify/functions/terrain.js, the same tiles the visual approaches' terrain check uses), Esri World Imagery
    draped on it, the runway, the traffic pattern at TPA and the visual approaches (3° paths in the air with a curtain
@@ -131,9 +131,12 @@
       if (data.labA) over.add(label(data.labA, '#ffffff', A[0] - ux * 80, Y(hAt(A[0], A[1])) + 60, A[1] - uz * 80));
       if (data.labB) over.add(label(data.labB, '#ffffff', B[0] + ux * 80, Y(hAt(B[0], B[1])) + 60, B[1] + uz * 80));
       if (data.pattern){
-        const y = Y(data.pattern.tpaM);
+        // v0.77: no AFAC elevation: 1,000 ft above the terrain model's runway elevation (mean of the two ends)
+        const tpaM = data.pattern.tpaM != null ? data.pattern.tpaM : (hAt(A[0], A[1]) + hAt(B[0], B[1])) / 2 + 1000 / FT;
+        const lbl = data.pattern.tpaM != null ? data.pattern.label : `TPA ≈ ${fmt(r10(tpaM * FT))}' (terrain)`;
+        const y = Y(tpaM);
         data.pattern.legs.forEach(([p, q]) => { const P = toXZ(p), Q = toXZ(q); over.add(dashed([P[0], y, P[1]], [Q[0], y, Q[1]], 150, 100, 0x33d1ff, 9)); });
-        if (data.pattern.label && data.pattern.dot){ const D = toXZ(data.pattern.dot); over.add(label(data.pattern.label, '#ffffff', D[0], y + 40, D[1])); }
+        if (lbl && data.pattern.dot){ const D = toXZ(data.pattern.dot); over.add(label(lbl, '#ffffff', D[0], y + 40, D[1])); }
       }
       V.forEach(v => {
         if (v.len){

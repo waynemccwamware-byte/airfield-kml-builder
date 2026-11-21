@@ -7,6 +7,9 @@
 // No npm packages (App Conventions §1). Data © OpenStreetMap contributors, ODbL.
 //
 // GET /.netlify/functions/osm?lat=26.25852&lon=-112.49787   (rounded to 5 decimals = the cache key)
+// v0.81 GET ...&veg=1&km=2.5 → what X-Plane vegetation must stay off, within km of the point (0.5–3.5):
+//      { roads: [[[lat,lon],…],…], buildings: [[[lat,lon],…],…], towns: [[[lat,lon],…],…] }
+//      roads = highway ways, buildings = building ways, towns = landuse residential/commercial/industrial/retail ways.
 
 const UA = 'GeezerGeekPilot-AirfieldKML/0.10 (+https://airfield-kml-builder.netlify.app)';
 const AEROWAY = /^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$/;
@@ -17,7 +20,7 @@ const json = (code, obj, cache) => ({
   headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, cache ? {
     'Cache-Control': 'public, max-age=3600',
     'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=604800',
-    'Netlify-Vary': 'query=lat|lon',
+    'Netlify-Vary': 'query=lat|lon|veg|km',
   } : { 'Cache-Control': 'no-store' }),
   body: JSON.stringify(obj),
 });
@@ -53,6 +56,41 @@ async function fromOsmApi(lat, lon, ms) {
   return { server: 'api.openstreetmap.org', elements: out };
 }
 
+// v0.81: vegetation keep-clear features (roads, buildings, towns), as plain coordinate lists
+const TOWN = /^(residential|commercial|industrial|retail)$/;
+const r6 = v => Math.round(v * 1e6) / 1e6;
+function vegSort(ways){
+  const out = { roads: [], buildings: [], towns: [] };
+  for (const w of ways){
+    const t = w.tags || {}, g = (w.geometry || []).filter(Boolean).map(p => [r6(p.lat), r6(p.lon)]);
+    if (g.length < 2) continue;
+    if (t.highway) out.roads.push(g);
+    else if (t.building && g.length >= 3) out.buildings.push(g);
+    else if (t.landuse && TOWN.test(t.landuse) && g.length >= 3) out.towns.push(g);
+  }
+  return out;
+}
+async function vegOsmApi(lat, lon, km, ms) {
+  const dLat = km / 110.574, dLon = km / (111.32 * Math.cos(lat * Math.PI / 180));
+  const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(v => v.toFixed(5)).join(',');
+  const res = await timed(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${bbox}`, { headers: { 'User-Agent': UA, Accept: 'application/json' } }, ms);
+  if (!res.ok) throw new Error(`api.openstreetmap.org: HTTP ${res.status}`);
+  const d = await res.json(), nodes = new Map(), ways = [];
+  for (const e of d.elements || []) if (e.type === 'node') nodes.set(e.id, e);
+  for (const e of d.elements || []) if (e.type === 'way' && e.tags && (e.tags.highway || e.tags.building || e.tags.landuse))
+    ways.push({ tags: e.tags, geometry: e.nodes.map(id => nodes.get(id)).filter(Boolean).map(n => ({ lat: n.lat, lon: n.lon })) });
+  return Object.assign({ server: 'api.openstreetmap.org' }, vegSort(ways));
+}
+async function vegOverpass(lat, lon, km, url, ms) {
+  const m = Math.round(km * 1000);
+  const query = `[out:json][timeout:20];(way(around:${m},${lat.toFixed(5)},${lon.toFixed(5)})[highway];way(around:${m},${lat.toFixed(5)},${lon.toFixed(5)})[building];way(around:${m},${lat.toFixed(5)},${lon.toFixed(5)})[landuse~"^(residential|commercial|industrial|retail)$"];);out geom;`;
+  const res = await timed(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Accept: '*/*', 'User-Agent': UA }, body: 'data=' + encodeURIComponent(query) }, ms);
+  const host = new URL(url).host;
+  if (!res.ok) throw new Error(`${host}: HTTP ${res.status}`);
+  const d = await res.json();
+  return Object.assign({ server: host }, vegSort((d.elements || []).filter(e => e.type === 'way')));
+}
+
 async function fromOverpass(lat, lon, url, ms) {
   const query = `[out:json][timeout:20];nwr(around:2500,${lat.toFixed(5)},${lon.toFixed(5)})[aeroway~"^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$"];out geom;`;
   const res = await timed(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Accept: '*/*', 'User-Agent': UA }, body: 'data=' + encodeURIComponent(query) }, ms);
@@ -69,6 +107,17 @@ exports.handler = async (event) => {
   if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return json(400, { error: 'lat and lon required' });
   const started = Date.now(), errs = [];
   const left = () => 9000 - (Date.now() - started);       // stay inside Netlify's function time limit
+  if (q.veg){
+    const km = Math.max(0.5, Math.min(3.5, parseFloat(q.km) || 2.5));
+    try { return json(200, Object.assign({ fetched: new Date().toISOString() }, await vegOsmApi(lat, lon, km, Math.min(6000, left()))), true); }
+    catch (e) { errs.push(e.name === 'AbortError' ? 'api.openstreetmap.org: timed out' : e.message); }
+    for (const url of OVERPASS) {
+      if (left() < 1500) break;
+      try { return json(200, Object.assign({ fetched: new Date().toISOString() }, await vegOverpass(lat, lon, km, url, left())), true); }
+      catch (e) { errs.push(e.name === 'AbortError' ? `${new URL(url).host}: timed out` : e.message); }
+    }
+    return json(502, { error: errs.join('; ') || 'no answer' });
+  }
   try { return json(200, Object.assign({ fetched: new Date().toISOString() }, await fromOsmApi(lat, lon, Math.min(6000, left()))), true); }
   catch (e) { errs.push(e.name === 'AbortError' ? 'api.openstreetmap.org: timed out' : e.message); }
   for (const url of OVERPASS) {

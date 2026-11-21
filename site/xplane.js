@@ -192,53 +192,85 @@
   }
   // objs: [{path, lat, lon, hdg}] all inside one 1°×1° tile; aptId filters them to this airport (RFC airport-ID exclusion)
   // v0.79: zones (exclusion zones) go in the header; a tile may have zones and no objects
-  function dsf(objs, aptId, zones, tile){
-    const [s, w] = tile || tileOf(objs[0].lat, objs[0].lon);
+  // v0.81: polys = forests (and other polygon types): [{ path, param, rings: [[[lat, lon], …], …] }], first ring the
+  //   outside, the rest holes; written counter-clockwise outside / clockwise holes as "DSF Usage in X-Plane" requires.
+  //   Forest param = density 0–255 (+256 line fill, +512 point fill). 2-plane (lon, lat) pool, nested-polygon command 14.
+  function dsf(objs, aptId, zones, tile, polys){
+    objs = objs || []; polys = (polys || []).filter(pl => pl.rings && pl.rings.length && pl.rings[0].length >= 3);
+    const [s, w] = tile || (objs.length ? tileOf(objs[0].lat, objs[0].lon) : tileOf(polys[0].rings[0][0][0], polys[0].rings[0][0][1]));
     const props = ['sim/west', String(w), 'sim/east', String(w + 1), 'sim/north', String(s + 1), 'sim/south', String(s),
       'sim/planet', 'earth', 'sim/creation_agent', 'GeezerGeek Pilot Mexican Airstrips', 'laminar/internal_revision', '0',
       'sim/overlay', '1', 'sim/filter/aptid', aptId, 'sim/require_agpoint', '1/0', 'sim/require_object', '1/0', ...exclProps(zones, s, w)];
     const head = atom('HEAD', atom('PROP', strTable(props)));
-    const defs = [...new Set(objs.map(o => o.path))];
-    const defn = atom('DEFN', [...atom('TERT', []), ...atom('OBJT', strTable(defs)), ...atom('POLY', []), ...atom('NETW', []), ...atom('DEMN', [])]);
-    // quantize: offset = 1/32° cell below the minimum, scale 1/32° (widened if the objects span more)
-    if (!objs.length){                                      // v0.79: exclusions only — no point pool, no object commands
-      const geod0 = atom('GEOD', [...atom('PO32', new Buf().u32(0).u8(0).a), ...atom('SC32', [])]);
+    const defs = [...new Set(objs.map(o => o.path))], pdefs = [...new Set(polys.map(pl => pl.path))];
+    const defn = atom('DEFN', [...atom('TERT', []), ...atom('OBJT', strTable(defs)), ...atom('POLY', strTable(pdefs)), ...atom('NETW', []), ...atom('DEMN', [])]);
+    const finish = (geodAtoms, cmdBytes) => {
+      const body = new Buf(); body.bytes([...'XPLNEDSF'].map(ch => ch.charCodeAt(0))).u32(1).bytes(head).bytes(defn).bytes(atom('GEOD', geodAtoms)).bytes(atom('CMDS', cmdBytes));
+      const bytes = new Uint8Array(body.a), out = new Uint8Array(bytes.length + 16); out.set(bytes); out.set(md5(bytes), bytes.length);
+      return { path: tilePath(s, w), bytes: out };
+    };
+    if (!objs.length && !polys.length){                      // v0.79: exclusions only — no point pool, no commands
       const c0 = new Buf(); c0.u8(2).u32(0);
-      const body0 = new Buf(); body0.bytes([...'XPLNEDSF'].map(ch => ch.charCodeAt(0))).u32(1).bytes(head).bytes(defn).bytes(geod0).bytes(atom('CMDS', c0.a));
-      const b0 = new Uint8Array(body0.a), out0 = new Uint8Array(b0.length + 16); out0.set(b0); out0.set(md5(b0), b0.length);
-      return { path: tilePath(s, w), bytes: out0 };
+      return finish([...atom('PO32', new Buf().u32(0).u8(0).a), ...atom('SC32', [])], c0.a);
     }
-    const minLat = Math.min(...objs.map(o => o.lat)), minLon = Math.min(...objs.map(o => o.lon));
-    const maxLat = Math.max(...objs.map(o => o.lat)), maxLon = Math.max(...objs.map(o => o.lon));
-    const offLon = Math.floor(minLon * 32) / 32, offLat = Math.floor(minLat * 32) / 32;
-    let sc = 0.03125; while (maxLon - offLon >= sc || maxLat - offLat >= sc) sc *= 2;
+    // quantize: offset = 1/32° cell below the minimum, scale 1/32° (widened if the points span more)
+    const fit = ll => {
+      const minLat = Math.min(...ll.map(p => p[0])), minLon = Math.min(...ll.map(p => p[1]));
+      const maxLat = Math.max(...ll.map(p => p[0])), maxLon = Math.max(...ll.map(p => p[1]));
+      const offLon = Math.floor(minLon * 32) / 32, offLat = Math.floor(minLat * 32) / 32;
+      let sc = 0.03125; while (maxLon - offLon >= sc || maxLat - offLat >= sc) sc *= 2;
+      return { offLon, offLat, sc };
+    };
     const q = (v, off, scale) => Math.max(0, Math.min(65535, Math.round((v - off) / scale * 65535)));
-    // objects grouped by definition, so each definition is one contiguous range of points
-    const order = []; defs.forEach((d, di) => objs.forEach(o => { if (o.path === d) order.push([o, di]); }));
-    // v0.57: draped objects = 3 planes (lon, lat, rotation), per xptools DSFLib.h obj_ModeDraped; the 4-plane AGL form
-    // copied from WED made Gateway validation warn "set_AGL=0.0m is discouraged" (Wayne, XMM000K, 15-Nov-2026)
-    const pts = order.map(([o]) => [q(o.lon, offLon, sc), q(o.lat, offLat, sc), q(((o.hdg % 360) + 360) % 360, 0, 360)]);
-    const scal = new Buf(); [[sc, offLon], [sc, offLat], [360, 0]].forEach(([a, c]) => scal.f32(a).f32(c));
-    const po32a = new Buf(); po32a.u32(0).u8(4).bytes([3, 3, 3, 3]);
-    const sc32a = new Buf(); [[1, w], [1, s], [65535, -32768], [0, 0]].forEach(([a, c]) => sc32a.f32(a).f32(c));
-    const po32b = new Buf(); po32b.u32(0).u8(0);
-    const geod = atom('GEOD', [...atom('POOL', pool16(pts, 3)), ...atom('SCAL', scal.a), ...atom('PO32', po32a.a), ...atom('SC32', sc32a.a), ...atom('PO32', po32b.a), ...atom('SC32', [])]);
-    const c = new Buf();
+    const geodAtoms = [], c = new Buf();
     c.u8(2).u32(0);                                         // junction offset 0
     c.u8(32).u8(6).u16(1).i32(0);                           // comment type 1: filter index 0 = sim/filter/aptid
-    let i = 0;
-    defs.forEach((d, di) => {
-      const n = order.filter(x => x[1] === di).length;
-      di < 256 ? c.u8(3).u8(di) : c.u8(4).u16(di);          // set definition
-      if (di === 0) c.u8(1).u16(0);                         // select point pool 0
-      c.u8(8).u16(i).u16(i + n);                            // object range [i, i+n)
-      i += n;
-    });
-    const cmds = atom('CMDS', c.a);
-    const body = new Buf(); body.bytes([...'XPLNEDSF'].map(ch => ch.charCodeAt(0))).u32(1).bytes(head).bytes(defn).bytes(geod).bytes(cmds);
-    const bytes = new Uint8Array(body.a);
-    const out = new Uint8Array(bytes.length + 16); out.set(bytes); out.set(md5(bytes), bytes.length);
-    return { path: tilePath(s, w), bytes: out };
+    let poolN = 0;
+    if (objs.length){
+      const F = fit(objs.map(o => [o.lat, o.lon]));
+      // objects grouped by definition, so each definition is one contiguous range of points
+      const order = []; defs.forEach((d, di) => objs.forEach(o => { if (o.path === d) order.push([o, di]); }));
+      // v0.57: draped objects = 3 planes (lon, lat, rotation), per xptools DSFLib.h obj_ModeDraped; the 4-plane AGL form
+      // copied from WED made Gateway validation warn "set_AGL=0.0m is discouraged" (Wayne, XMM000K, 15-Nov-2026)
+      const pts = order.map(([o]) => [q(o.lon, F.offLon, F.sc), q(o.lat, F.offLat, F.sc), q(((o.hdg % 360) + 360) % 360, 0, 360)]);
+      const scal = new Buf(); [[F.sc, F.offLon], [F.sc, F.offLat], [360, 0]].forEach(([a, b]) => scal.f32(a).f32(b));
+      geodAtoms.push(...atom('POOL', pool16(pts, 3)), ...atom('SCAL', scal.a));
+      c.u8(1).u16(poolN);                                   // select this point pool
+      let i = 0;
+      defs.forEach((d, di) => {
+        const n = order.filter(x => x[1] === di).length;
+        di < 256 ? c.u8(3).u8(di) : c.u8(4).u16(di);        // set definition (OBJT index)
+        c.u8(8).u16(i).u16(i + n);                          // object range [i, i+n)
+        i += n;
+      });
+      poolN++;
+    }
+    if (polys.length){
+      const all = polys.flatMap(pl => pl.rings.flat());
+      const F = fit(all), pts = [];
+      const area = r => { let a = 0; r.forEach((p, k) => { const n = r[(k + 1) % r.length]; a += p[1] * n[0] - n[1] * p[0]; }); return a / 2; };  // x = lon, y = lat
+      c.u8(1).u16(poolN);
+      polys.forEach(pl => {
+        const di = pdefs.indexOf(pl.path);
+        di < 256 ? c.u8(3).u8(di) : c.u8(4).u16(di);        // set definition (POLY index)
+        const rings = pl.rings.map((r, k) => {
+          r = r.slice(); const L = r.length; if (L > 2 && r[0][0] === r[L - 1][0] && r[0][1] === r[L - 1][1]) r.pop();   // no repeated closing point
+          const ccw = area(r) > 0; if ((k === 0) !== ccw) r.reverse();   // outside CCW, holes CW
+          if (r.length > 255) throw new Error('a polygon ring has more than 255 points');
+          return r.map(p => { pts.push([q(p[1], F.offLon, F.sc), q(p[0], F.offLat, F.sc)]); return pts.length - 1; });
+        });
+        if (pts.length > 65535) throw new Error('too many polygon points for one DSF');
+        c.u8(14).u16(pl.param & 0xffff).u8(rings.length);  // nested polygon: param, winding count
+        rings.forEach(r => { c.u8(r.length); r.forEach(ix => c.u16(ix)); });
+      });
+      const scal = new Buf(); [[F.sc, F.offLon], [F.sc, F.offLat]].forEach(([a, b]) => scal.f32(a).f32(b));
+      geodAtoms.push(...atom('POOL', pool16(pts, 2)), ...atom('SCAL', scal.a));
+    }
+    // 32-bit pools as before: one 4-plane (empty) and one empty
+    const po32a = new Buf(); po32a.u32(0).u8(4).bytes([3, 3, 3, 3]);
+    const sc32a = new Buf(); [[1, w], [1, s], [65535, -32768], [0, 0]].forEach(([a, b]) => sc32a.f32(a).f32(b));
+    geodAtoms.push(...atom('PO32', po32a.a), ...atom('SC32', sc32a.a), ...atom('PO32', new Buf().u32(0).u8(0).a), ...atom('SC32', []));
+    return finish(geodAtoms, c.a);
   }
 
   // ---------- MD5 (RFC 1321) ----------
@@ -291,7 +323,8 @@
   // objs: [{id (catalog), lat, lon, hdg}]; layout (v0.51): the app's editable layout, saved in the pack as LAYOUT_FILE
   // so opening the zip in the app later (any device) brings back exactly what was on the map. X-Plane ignores the file.
   const LAYOUT_FILE = 'mx-airstrips-layout.json';
-  function pack(m, objs, readme, layout, zones){
+  // v0.81: polys = vegetation (forest) polygons from veg.js, each already inside one 1°×1° tile
+  function pack(m, objs, readme, layout, zones, polys){
     const folder = `${m.id} ${m.name}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 _-]+/g, '').trim().slice(0, 60);
     const files = [[`${folder}/Earth nav data/apt.dat`, aptDat(m)], [`${folder}/README.txt`, readme]];
     if (layout) files.push([`${folder}/${LAYOUT_FILE}`, JSON.stringify(layout, null, 1)]);
@@ -301,7 +334,9 @@
     // v0.79: every tile an exclusion zone touches gets a DSF too (zones clipped to each tile)
     (zones || []).forEach(z => { if (!z.t || !z.t.length) return;
       for (let la = Math.floor(z.b[0]); la <= Math.floor(z.b[2] - 1e-9); la++) for (let lo = Math.floor(z.b[1]); lo <= Math.floor(z.b[3] - 1e-9); lo++){ const k = la + ',' + lo; byTile[k] = byTile[k] || []; } });
-    Object.entries(byTile).forEach(([k, list]) => { const d = dsf(list, m.id, zones, k.split(',').map(Number)); files.push([`${folder}/Earth nav data/${d.path}`, d.bytes]); });
+    const polyTile = {};
+    (polys || []).forEach(pl => { const k = tileOf(pl.rings[0][0][0], pl.rings[0][0][1]).join(','); (polyTile[k] = polyTile[k] || []).push(pl); byTile[k] = byTile[k] || []; });
+    Object.entries(byTile).forEach(([k, list]) => { const d = dsf(list, m.id, zones, k.split(',').map(Number), polyTile[k]); files.push([`${folder}/Earth nav data/${d.path}`, d.bytes]); });
     return { name: folder + '.zip', blob: zip(files), files };
   }
 

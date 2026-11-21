@@ -112,7 +112,7 @@ def plan():
     cuts = [0, 2.6, 10.0, 12.6, 17.2, D]   # mission | clinic montage | posada and mountain | robrc search | robrc row
     shots = [('still', PH['mission'], 1.0, 1.08, 0.5, 0.45),
              ('montage', [(PH['gil'], 0.5, 0.55), (PH['eric'], 0.45, 0.45), (PH['aimee'], 0.5, 0.22), (PH['clinic'], 0.5, 0.5)]),
-             ('still', PH['mountain'], 1.0, 1.06, 0.5, 0.45), ('cap', RA, ''), ('cap', RB, '')]
+             ('still', PH['mountain'], 1.0, 1.06, 0.5, 0.45), ('cap', RA, ''), ('cap', RB, 'crop=1920:980:0:100,pad=1920:1080:0:0,fillborders=bottom=100:mode=smear')]   # RB: lift the table 100 px so the half-cut results line at the top is gone
     names = ['mission', 'clinic montage', 'posada and mountain', 'robrc.net search', 'robrc.net SQA row']
     for j in range(5):
         a, b = cuts[j], cuts[j + 1]
@@ -152,8 +152,16 @@ if __name__ == '__main__':
     P = plan()
     only = set(sys.argv[1:])
     t, segs, marks = 0.0, [], []
+    # VO takes that span several shots are laid once, continuously, in the final mix (per-shot slices left
+    # AAC-seam dropouts where a cut fell mid-word); single-shot takes stay in their shot
+    span = {s['vo'] for s in P if s.get('vo') and (s.get('vo_ss', 0) > 0 or s.get('vo_at', 0) + vod(s['vo']) > s['D'] + 0.05)}
+    glob, tt = {}, 0.0
+    for s in P:
+        if s.get('vo') in span and s.get('vo_ss', 0) == 0 and s['vo'] not in glob: glob[s['vo']] = tt + s.get('vo_at', 0)
+        tt += s['D']
     for i, s in enumerate(P):
         args = {k: s[k] for k in ('vo', 'vo_at', 'vo_ss', 'natural', 'overlays', 'fade_black') if k in s}
+        if args.get('vo') in span: args = {k: v for k, v in args.items() if k not in ('vo', 'vo_at', 'vo_ss')}
         if not only or str(i) in only:
             render(i, s['D'], s['video'], **args)
         segs.append(SEG / f'{i:02d}.mp4'); marks.append((round(t, 2), s['tag'])); t += s['D']
@@ -163,7 +171,12 @@ if __name__ == '__main__':
     T = dur('/home/claude/cut/body.mp4'); m0 = 0.0   # music from the first frame
     # music: loop to length, -27 LUFS bed, ducked by the VO+location sound, fade in/out
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
-    ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
-        "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v12.mp4'])
+    vin, vfc = [], []
+    for j, (n, at) in enumerate(sorted(glob.items(), key=lambda kv: kv[1])):
+        vin += ['-i', str(VO / f'{n}.m4a')]; ms = int(round(at * 1000))
+        vfc.append(f"[{2 + j}:a]aresample=48000,aformat=channel_layouts=stereo,adelay={ms}|{ms}[g{j}]")
+    gmix = ';'.join(vfc) + ';' + f"[0:a]{''.join(f'[g{j}]' for j in range(len(glob)))}amix=inputs={1 + len(glob)}:duration=first:normalize=0[body];" if glob else "[0:a]anull[body];"
+    ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', *vin, '-filter_complex',
+        gmix + "[body]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v14.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

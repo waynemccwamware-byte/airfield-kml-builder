@@ -4,6 +4,7 @@ U = pathlib.Path('/mnt/user-data/uploads'); CAP = pathlib.Path('/home/claude/cap
 VO = pathlib.Path('/home/claude/airfield-kml-builder/tools/video-intro/vo')
 MUSIC = '/home/claude/vref/piston-ga-stats/tools/video-safety/music/ende-ambient-acoustic-guitars-vol-1.mp3'
 SEG = pathlib.Path('/home/claude/cut/seg'); SEG.mkdir(exist_ok=True)
+XP = U / 'video-clips-x-plane' / 'clean'; SIMK = str(XP / 'xsqa-cockpit-sound-v3.mp4'); SIMO = str(XP / 'xsqa-outside-sound-v3.mp4')   # real = sim + 115.7 s (cockpit)
 LAND = str(U / 'SPdlC-landing.mp4'); FFREC = str(U / 'ScreenRecording_11-18-2026_08-49-19_1.mp4'); TAXI = str(U / '868e5326-taxi-out.mp4'); TKOF = str(U / '94915a95-takeoff.mp4')
 PH = {'clinic': '/home/claude/out/free-clinic-blurred.jpg', 'gil': '/home/claude/out/clinic-gil-blurred.jpg', 'eric': str(U / '60257839-image.jpg'), 'aimee': '/home/claude/out/clinic-aimee-blurred.jpg', 'mission': str(U / '42918236-image.jpg'), 'sunset': str(U / 'bc10abd3-image.jpg'), 'mountain': '/home/claude/cut/mountain.jpg'}
 W, H, FPS = 1920, 1080, 30
@@ -61,6 +62,15 @@ def render(i, D, video, vo=None, vo_at=0.0, vo_ss=0.0, natural=None, overlays=()
         _, src, ss, ph = video
         inp += ['-ss', str(ss), '-t', f'{D:.3f}', '-i', src, '-loop', '1', '-t', f'{D:.3f}', '-i', ph]
         fc.append(f"[0:v]scale=-2:{H},crop={W//2}:{H},fps={FPS},setsar=1[l];[1:v]scale={W}:{H},crop={W//2}:{H}:{W//4}:0,fps={FPS},setsar=1[r];[l][r]hstack=2,format=yuv420p[v0]")
+    elif k == 'simsplit':   # ('simsplit', sim, s0, lead, real, r0, rcx, scx): sim full-screen for `lead` s, then real | sim, cropped at cx
+        _, sim, s0, lead, real, r0, rcx, scx = video
+        inp += ['-ss', f'{s0:.3f}', '-t', f'{D:.3f}', '-i', sim, '-ss', f'{r0:.3f}', '-t', f'{D - lead:.3f}', '-i', real]
+        half = lambda lbl, cx: f"scale=-2:{H},crop={W//2}:{H}:(iw-{W//2})*{cx}:0,fps={FPS},setsar=1[{lbl}]"
+        if lead:
+            fc.append(f"[0:v]split[sa][sb];[sa]trim=0:{lead},setpts=PTS-STARTPTS,scale={W}:{H},fps={FPS},setsar=1,format=yuv420p[full];"
+                      f"[sb]trim={lead}:{D:.3f},setpts=PTS-STARTPTS,{half('rs', scx)};[1:v]{half('rl', rcx)};[rl][rs]hstack=2,format=yuv420p[sp];[full][sp]concat=n=2:v=1:a=0[v0]")
+        else:
+            fc.append(f"[0:v]{half('rs', scx)};[1:v]{half('rl', rcx)};[rl][rs]hstack=2,format=yuv420p[v0]")
     n = len(inp) // 2 if k != 'clip' else 1
     n = sum(1 for a in inp if a == '-i')
     last = 'v0'
@@ -93,7 +103,7 @@ def plan():
     L = 0.4   # lead before the VO on non-capture segments
     P = []
     P.append(dict(D=8.6, video=('clip', LAND, 131.0, ''), natural=(LAND, 131.0, -15), tag='cold open: real final, rwy 34', music=False))
-    d = vod('s1-a'); P.append(dict(D=d + L + 0.3, video=('split', LAND, 131.0, str(G / 'ph-xsqa-final.png')), vo='s1-a', vo_at=L, overlays=[(G / 'to-xsqa.png', 0.4, d + L)], tag='s1-a split'))
+    d = vod('s1-a'); P.append(dict(D=d + L + 0.3, video=('simsplit', SIMK, 11.6, 4.0, LAND, 11.6 + 4.0 + 115.7, 0.8, 0.22), natural=(SIMK, 11.6, -20), vo='s1-a', vo_at=L, overlays=[(G / 'to-xsqa.png', 0.4, d + L)], tag='s1-a split'))
     d = vod('s1-b'); P.append(dict(D=d + L + 0.6, video=('still', PH['sunset'], 1.0, 1.10, 0.5, 0.6), vo='s1-b', vo_at=L, overlays=[(G / 'title.png', 0.3, d + L + 0.6)], tag='s1-b title'))
     d = vod('s1-c'); D = d + L + 0.3   # cockpit only: the landing video cuts to a full-screen map at ~0:10 and back at ~0:18
     P.append(dict(D=D, video=('clipcat', LAND, [(0.4, 9.7), (19.6, 19.6 + D - 9.3)], f"zoompan=z='1+0.75*in/{int(D*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.73-ih/zoom/2':d=1:s=1280x720:fps={FPS}"), vo='s1-c', vo_at=L, tag='s1-c ForeFlight PiP'))
@@ -125,7 +135,7 @@ def plan():
     d = vod('s3-g'); P.append(dict(D=6.0 + d + 0.6, video=('still', str(G / 'ph-xsby-land.png'), 1, 1, .5, .5), vo='s3-g', vo_at=6.0, tag='s3-g PLACEHOLDER (sim)'))
     # caution VO starts on the split ("…in real life or on the sim"), cuts to the app's disclaimer at the pause after "sim"
     CUT = 8.5
-    P.append(dict(D=L + CUT, video=('split', LAND, 131.5, str(G / 'ph-xsqa-final.png')), natural=(LAND, 131.5, -22), vo='s4-a', vo_at=L, tag='split real/XSQA + caution VO'))
+    P.append(dict(D=L + CUT, video=('simsplit', SIMO, 4.7, 0, LAND, 131.5, 0.8, 0.5), natural=(LAND, 131.5, -22), vo='s4-a', vo_at=L, tag='split real/XSQA + caution VO'))
     D = vod('s4-a') - CUT + 1.0; P.append(dict(D=D, video=('cap', CAP / 's4-a.mp4', f"zoompan=z='1+0.32*in/{int(D*FPS)}':x='iw*0.5-iw/zoom/2':y='ih*0.60-ih/zoom/2':d=1:s={W}x{H}:fps={FPS}"), vo='s4-a', vo_ss=CUT, vo_at=0, tag='s4-a caution'))
     d = vod('s4-b')
     P.append(dict(D=7.0, video=('clip', TKOF, 0.0, ''), natural=(TKOF, 0.0, -20), vo='s4-b', vo_at=L, tag='s4-b takeoff'))
@@ -151,5 +161,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v9.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v10.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

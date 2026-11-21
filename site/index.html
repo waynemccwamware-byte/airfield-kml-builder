@@ -2155,7 +2155,7 @@ b{ color:#f5a623; }
         water = (la, lo) => elevM([la, lo]) <= 0.5;
       } catch (e){ waterOk = false; }
       const g = XPVEG.compute({ ends: [m.rwy.a, m.rwy.b], widthM: m.rwy.widthM, km: xpVeg.km,
-        keep: { polys: keepPolys, boxes, rects: xpExcl.map(z => z.b), roads: [...lines, ...osmx.roads], buildings: osmx.buildings, towns: osmx.towns }, water });
+        keep: { polys: keepPolys, boxes, rects: xpExcl.map(z => z.b), roads: osmx.roads, tracks: [...lines, ...(osmx.tracks || [])], buildings: osmx.buildings, towns: osmx.towns }, water });
       return { ...g, osmOk, waterOk };
     })();
     xpVegRun = { key, p: run };
@@ -2188,7 +2188,7 @@ b{ color:#f5a623; }
     xpLayer.clearLayers();
     let g = null; try { g = xpGeom(); } catch (e){}
     if (xpVeg.on && xpVegGeo && xpVegGeo.pieces.length)   // v0.81: where vegetation will grow
-      L.polygon(xpVegGeo.pieces, { color:'#7cb342', weight:0.6, opacity:.7, fillColor:'#7cb342', fillOpacity:.16, interactive:false }).addTo(xpLayer);
+      L.polygon(xpVegGeo.pieces, { stroke:false, fillColor:'#8bc34a', fillOpacity:.28, interactive:false }).addTo(xpLayer);
     const drag = (ll, cls, size, tip, done, z) => { const m = L.marker(ll, { draggable:true, autoPan:AUTOPAN, zIndexOffset:z || 0, title:tip, icon:hIcon(cls, size) }).addTo(xpLayer); m.bindTooltip(tip); m.on('dragend', () => { const p = m.getLatLng(); done([p.lat, p.lng]); xpDraw(); xpSave(); }); return m; };
     let rp = null;
     if (g && g.rampPoly){

@@ -45,7 +45,9 @@
   // ---------- local metres around a reference point ----------
   function frame(ref){
     const kx = 111320 * Math.cos(ref[0] * Math.PI / 180), ky = 110574;
-    return { xy: p => [(p[1] - ref[1]) * kx, (p[0] - ref[0]) * ky], ll: q => [q[1] / ky + ref[0], q[0] / kx + ref[1]] };
+    // coordinates snapped to 5 cm: polygon-clipping can fail on points a hair apart
+    const sn = v => Math.round(v * 20) / 20;
+    return { xy: p => [sn((p[1] - ref[1]) * kx), sn((p[0] - ref[0]) * ky)], ll: q => [q[1] / ky + ref[0], q[0] / kx + ref[1]] };
   }
   const close = r => (r.length && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1])) ? [...r, r[0]] : r;
   const rect = (x0, y0, x1, y1) => [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]];
@@ -78,7 +80,7 @@
 
   // o: { ends: [[lat,lon],[lat,lon]], widthM, km,
   //      keep: { polys: [[[lat,lon]…]] (kept clear as drawn, grown by grow m), boxes: [[[lat,lon]…]] (bounding box, grown),
-  //              rects: [[s,w,n,e]] (exclusion zones), roads: [[[lat,lon]…]], buildings: [...], towns: [...] },
+  //              rects: [[s,w,n,e]] (exclusion zones), roads: [[[lat,lon]…]], tracks: [...], buildings: [...], towns: [...] },
   //      water: (lat, lon) => true for water | null }
   // → { pieces: [[ring, hole…] in lat/lon], areaKm2, counts }
   function compute(o){
@@ -92,9 +94,21 @@
     (k.rects || []).forEach(z => { const p = F.xy([z[0], z[1]]), q = F.xy([z[2], z[3]]); keep.push(rect(p[0], p[1], q[0], q[1])); });
     const inR = q => Math.hypot(q[0] - (a[0] + b[0]) / 2, q[1] - (a[1] + b[1]) / 2) < R + Math.hypot(b[0] - a[0], b[1] - a[1]) / 2 + 200;
     let nRoads = 0, nB = 0, nT = 0;
-    (k.roads || []).forEach(line => { const q = line.map(F.xy); for (let i = 0; i + 1 < q.length; i++) if (inR(q[i]) || inR(q[i + 1])){ keep.push(band(q[i], q[i + 1], 10, 4)); nRoads++; } });
+    // built-up areas from street density: 100 m squares holding 180 m of road or more (two streets or more) (towns OpenStreetMap hasn't outlined)
+    const C = 100, dens = new Map();
+    (k.roads || []).forEach(line => { const q = line.map(F.xy); for (let i = 0; i + 1 < q.length; i++){
+      const L = Math.hypot(q[i + 1][0] - q[i][0], q[i + 1][1] - q[i][1]);
+      if (!((inR(q[i]) || inR(q[i + 1])) && L > 0.5)) continue;
+      keep.push(band(q[i], q[i + 1], 10, 4)); nRoads++;
+      for (let t = 0; t < L; t += 10){ const x = q[i][0] + (q[i + 1][0] - q[i][0]) * t / L, y = q[i][1] + (q[i + 1][1] - q[i][1]) * t / L, key = Math.floor(x / C) + ',' + Math.floor(y / C);
+        dens.set(key, (dens.get(key) || 0) + Math.min(10, L - t)); }
+    } });
+    (k.tracks || []).forEach(line => { const q = line.map(F.xy); for (let i = 0; i + 1 < q.length; i++){   // tracks and paths: narrow, not town
+      if ((inR(q[i]) || inR(q[i + 1])) && Math.hypot(q[i + 1][0] - q[i][0], q[i + 1][1] - q[i][1]) > 0.5){ keep.push(band(q[i], q[i + 1], 4, 2)); nRoads++; } } });
+    let nBlocks = 0;
+    dens.forEach((len, key) => { if (len >= 180){ const [i, j] = key.split(',').map(Number); keep.push(rect(i * C - 40, j * C - 40, (i + 1) * C + 40, (j + 1) * C + 40)); nBlocks++; } });
     (k.buildings || []).forEach(p => { const q = p.map(F.xy); if (q.length >= 3 && inR(q[0])){ keep.push(bboxGrow(q, 12)); nB++; } });
-    (k.towns || []).forEach(p => { const q = p.map(F.xy); if (q.length >= 3 && inR(q[0])){ keep.push([close(q)]); nT++; } });
+    (k.towns || []).forEach(p => { const q = p.map(F.xy).filter((v, i, A) => !i || v[0] !== A[i - 1][0] || v[1] !== A[i - 1][1]); if (q.length >= 3 && inR(q[0]) && ringArea(close(q)) > 1){ keep.push([close(q)]); nT++; } });
     let waterKm2 = 0;
     if (o.water){                                                              // 40 m cells, merged into runs per row
       const st = 40, xs = outer[0].map(p => p[0]), ys = outer[0].map(p => p[1]);
@@ -108,11 +122,18 @@
         }
       }
     }
-    let plant = PC.difference(outer, unionAll(keep));
+    let plant;
+    try { plant = PC.difference(outer, unionAll(keep)); }
+    catch (e){   // retry with everything snapped to 0.5 m
+      const s5 = g => JSON.parse(JSON.stringify(g), (key, v) => typeof v === 'number' ? Math.round(v * 2) / 2 : v);
+      plant = PC.difference(s5(outer), unionAll(keep.map(s5)));
+    }
     // split on a 500 m grid (finer where a ring still has too many points)
-    const pieces = [];
+    const pieces = []; let skipped = 0;
     const cut = (mp, x0, y0, s, depth) => {
-      const part = PC.intersection(mp, rect(x0, y0, x0 + s, y0 + s));
+      let part;
+      try { part = PC.intersection(mp, rect(x0, y0, x0 + s, y0 + s)); }
+      catch (e){ try { part = PC.intersection(mp, rect(x0 - 0.37, y0 - 0.37, x0 + s + 0.37, y0 + s + 0.37)); } catch (e2){ skipped++; return; } }
       for (const poly of part){
         if (ringArea(poly[0]) < 150) continue;
         if (poly.some(r => r.length > 250)){
@@ -122,10 +143,11 @@
         pieces.push(poly);
       }
     };
-    const xs = outer[0].map(p => p[0]), ys = outer[0].map(p => p[1]), S = 500;
-    for (let x = Math.floor(Math.min(...xs) / S) * S; x < Math.max(...xs); x += S)
-      for (let y = Math.floor(Math.min(...ys) / S) * S; y < Math.max(...ys); y += S) cut(plant, x, y, S, 0);
-    return { pieces: pieces.map(poly => poly.map(r => r.map(F.ll))), areaKm2: mpArea(pieces) / 1e6, counts: { roads: nRoads, buildings: nB, towns: nT, waterKm2 } };
+    // grid lines off round numbers (a grid line touching the ring's tip broke polygon-clipping at SBY)
+    const xs = outer[0].map(p => p[0]), ys = outer[0].map(p => p[1]), S = 500, OFF = 137.3;
+    for (let x = Math.floor((Math.min(...xs) - OFF) / S) * S + OFF; x < Math.max(...xs); x += S)
+      for (let y = Math.floor((Math.min(...ys) - OFF) / S) * S + OFF; y < Math.max(...ys); y += S) cut(plant, x, y, S, 0);
+    return { pieces: pieces.map(poly => poly.map(r => r.map(F.ll))), areaKm2: mpArea(pieces) / 1e6, counts: { roads: nRoads, buildings: nB, towns: nT, blocks: nBlocks, waterKm2, skipped } };
   }
 
   // pieces → DSF polygons for one preset and density, each clipped to its 1°×1° tile

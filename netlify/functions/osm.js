@@ -8,8 +8,9 @@
 //
 // GET /.netlify/functions/osm?lat=26.25852&lon=-112.49787   (rounded to 5 decimals = the cache key)
 // v0.81 GET ...&veg=1&km=2.5 → what X-Plane vegetation must stay off, within km of the point (0.5–3.5):
-//      { roads: [[[lat,lon],…],…], buildings: [[[lat,lon],…],…], towns: [[[lat,lon],…],…] }
-//      roads = highway ways, buildings = building ways, towns = landuse residential/commercial/industrial/retail ways.
+//      { roads: [[[lat,lon],…],…], tracks: […], buildings: [[[lat,lon],…],…], towns: [[[lat,lon],…],…] }
+//      roads = highway ways (streets and roads), tracks = highway track/path/footway/bridleway/cycleway/steps,
+//      buildings = building ways, towns = landuse residential/commercial/industrial/retail ways.
 
 const UA = 'GeezerGeekPilot-AirfieldKML/0.10 (+https://airfield-kml-builder.netlify.app)';
 const AEROWAY = /^(runway|taxiway|taxilane|apron|hangar|aerodrome|stopway)$/;
@@ -58,13 +59,14 @@ async function fromOsmApi(lat, lon, ms) {
 
 // v0.81: vegetation keep-clear features (roads, buildings, towns), as plain coordinate lists
 const TOWN = /^(residential|commercial|industrial|retail)$/;
+const TRACK = /^(track|path|footway|bridleway|cycleway|steps)$/;
 const r6 = v => Math.round(v * 1e6) / 1e6;
 function vegSort(ways){
-  const out = { roads: [], buildings: [], towns: [] };
+  const out = { roads: [], tracks: [], buildings: [], towns: [] };
   for (const w of ways){
     const t = w.tags || {}, g = (w.geometry || []).filter(Boolean).map(p => [r6(p.lat), r6(p.lon)]);
     if (g.length < 2) continue;
-    if (t.highway) out.roads.push(g);
+    if (t.highway) (TRACK.test(t.highway) ? out.tracks : out.roads).push(g);
     else if (t.building && g.length >= 3) out.buildings.push(g);
     else if (t.landuse && TOWN.test(t.landuse) && g.length >= 3) out.towns.push(g);
   }

@@ -171,16 +171,43 @@
     }
     return b.a;
   }
+  // ---------- v0.79: exclusion zones (Wayne, SQA: the Gateway airport's tree exclusions were lost on import) ----------
+  // Each zone is a north-up rectangle, written as DSF properties sim/exclude_<type> "west/south/east/north"
+  // (DSF Usage in X-Plane; the form WED writes, e.g. Gateway XMM000J). It hides lower-priority scenery of that type inside it.
+  const EXCL_TYPES = [
+    { t: 'for', label: 'Trees (forests)' }, { t: 'obj', label: 'Objects' }, { t: 'fac', label: 'Buildings (facades)' },
+    { t: 'net', label: 'Roads' }, { t: 'pol', label: 'Draped polygons' }, { t: 'lin', label: 'Lines' },
+    { t: 'str', label: 'Object strings' }, { t: 'bch', label: 'Beaches' },
+  ];
+  const EXCL_OK = new Set(EXCL_TYPES.map(x => x.t));
+  // zones: [{ b: [south, west, north, east], t: ['for', …] }] → [name, value] pairs for one tile (clipped to it)
+  function exclProps(zones, s, w){
+    const out = [], f6 = v => (+v).toFixed(6);
+    (zones || []).forEach(z => {
+      const S = Math.max(z.b[0], s), W = Math.max(z.b[1], w), N = Math.min(z.b[2], s + 1), E = Math.min(z.b[3], w + 1);
+      if (!(N > S && E > W)) return;
+      z.t.filter(t => EXCL_OK.has(t)).forEach(t => out.push('sim/exclude_' + t, `${f6(W)}/${f6(S)}/${f6(E)}/${f6(N)}`));
+    });
+    return out;
+  }
   // objs: [{path, lat, lon, hdg}] all inside one 1°×1° tile; aptId filters them to this airport (RFC airport-ID exclusion)
-  function dsf(objs, aptId){
-    const [s, w] = tileOf(objs[0].lat, objs[0].lon);
+  // v0.79: zones (exclusion zones) go in the header; a tile may have zones and no objects
+  function dsf(objs, aptId, zones, tile){
+    const [s, w] = tile || tileOf(objs[0].lat, objs[0].lon);
     const props = ['sim/west', String(w), 'sim/east', String(w + 1), 'sim/north', String(s + 1), 'sim/south', String(s),
       'sim/planet', 'earth', 'sim/creation_agent', 'GeezerGeek Pilot Mexican Airstrips', 'laminar/internal_revision', '0',
-      'sim/overlay', '1', 'sim/filter/aptid', aptId, 'sim/require_agpoint', '1/0', 'sim/require_object', '1/0'];
+      'sim/overlay', '1', 'sim/filter/aptid', aptId, 'sim/require_agpoint', '1/0', 'sim/require_object', '1/0', ...exclProps(zones, s, w)];
     const head = atom('HEAD', atom('PROP', strTable(props)));
     const defs = [...new Set(objs.map(o => o.path))];
     const defn = atom('DEFN', [...atom('TERT', []), ...atom('OBJT', strTable(defs)), ...atom('POLY', []), ...atom('NETW', []), ...atom('DEMN', [])]);
     // quantize: offset = 1/32° cell below the minimum, scale 1/32° (widened if the objects span more)
+    if (!objs.length){                                      // v0.79: exclusions only — no point pool, no object commands
+      const geod0 = atom('GEOD', [...atom('PO32', new Buf().u32(0).u8(0).a), ...atom('SC32', [])]);
+      const c0 = new Buf(); c0.u8(2).u32(0);
+      const body0 = new Buf(); body0.bytes([...'XPLNEDSF'].map(ch => ch.charCodeAt(0))).u32(1).bytes(head).bytes(defn).bytes(geod0).bytes(atom('CMDS', c0.a));
+      const b0 = new Uint8Array(body0.a), out0 = new Uint8Array(b0.length + 16); out0.set(b0); out0.set(md5(b0), b0.length);
+      return { path: tilePath(s, w), bytes: out0 };
+    }
     const minLat = Math.min(...objs.map(o => o.lat)), minLon = Math.min(...objs.map(o => o.lon));
     const maxLat = Math.max(...objs.map(o => o.lat)), maxLon = Math.max(...objs.map(o => o.lon));
     const offLon = Math.floor(minLon * 32) / 32, offLat = Math.floor(minLat * 32) / 32;
@@ -264,14 +291,17 @@
   // objs: [{id (catalog), lat, lon, hdg}]; layout (v0.51): the app's editable layout, saved in the pack as LAYOUT_FILE
   // so opening the zip in the app later (any device) brings back exactly what was on the map. X-Plane ignores the file.
   const LAYOUT_FILE = 'mx-airstrips-layout.json';
-  function pack(m, objs, readme, layout){
+  function pack(m, objs, readme, layout, zones){
     const folder = `${m.id} ${m.name}`.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 _-]+/g, '').trim().slice(0, 60);
     const files = [[`${folder}/Earth nav data/apt.dat`, aptDat(m)], [`${folder}/README.txt`, readme]];
     if (layout) files.push([`${folder}/${LAYOUT_FILE}`, JSON.stringify(layout, null, 1)]);
     const placed = objs.map(o => ({ path: BY_ID[o.id].path, lat: o.lat, lon: o.lon, hdg: o.hdg }));
     const byTile = {};
     placed.forEach(o => { const k = tileOf(o.lat, o.lon).join(','); (byTile[k] = byTile[k] || []).push(o); });
-    Object.values(byTile).forEach(list => { const d = dsf(list, m.id); files.push([`${folder}/Earth nav data/${d.path}`, d.bytes]); });
+    // v0.79: every tile an exclusion zone touches gets a DSF too (zones clipped to each tile)
+    (zones || []).forEach(z => { if (!z.t || !z.t.length) return;
+      for (let la = Math.floor(z.b[0]); la <= Math.floor(z.b[2] - 1e-9); la++) for (let lo = Math.floor(z.b[1]); lo <= Math.floor(z.b[3] - 1e-9); lo++){ const k = la + ',' + lo; byTile[k] = byTile[k] || []; } });
+    Object.entries(byTile).forEach(([k, list]) => { const d = dsf(list, m.id, zones, k.split(',').map(Number)); files.push([`${folder}/Earth nav data/${d.path}`, d.bytes]); });
     return { name: folder + '.zip', blob: zip(files), files };
   }
 
@@ -350,8 +380,11 @@
     function atoms(start, end){ const a = []; let o = start; while (o + 8 <= end){ const len = dv.getUint32(o + 4, true); if (len < 8 || o + len > end) break; a.push({ id: id(o), s: o + 8, e: o + len }); o += len; } return a; }
     const strs = (s, e) => new TextDecoder().decode(u.subarray(s, e)).split('\0').filter(Boolean);
     const top = atoms(12, u.length - 16), get = (list, k) => list.filter(x => x.id === k);
+    // v0.79: exclusion zones from the header's properties, returned as out.excl
+    const excl = [], head = get(top, 'HEAD')[0];
+    if (head){ get(atoms(head.s, head.e), 'PROP').forEach(a => { const p = strs(a.s, a.e); for (let i = 0; i + 1 < p.length; i += 2) addExcl(excl, p[i], p[i + 1]); }); }
     const defn = get(top, 'DEFN')[0], geod = get(top, 'GEOD')[0], cmds = get(top, 'CMDS')[0];
-    if (!defn || !geod || !cmds) return [];
+    if (!defn || !geod || !cmds){ const none = []; none.excl = excl; return none; }
     const objt = get(atoms(defn.s, defn.e), 'OBJT').flatMap(a => strs(a.s, a.e));
     const g = atoms(geod.s, geod.e), pools = get(g, 'POOL').map(a => decodePool(a.s, a.e)), scal = get(g, 'SCAL').map(a => { const f = []; for (let o = a.s; o + 8 <= a.e; o += 8) f.push([dv.getFloat32(o, true), dv.getFloat32(o + 4, true)]); return f; });
     function decodePool(s, e){
@@ -387,22 +420,38 @@
       else if (c === 32){ const n = U8(); o += n; } else if (c === 33){ const n = U16(); o += n; } else if (c === 34){ const n = U32(); o += n; }
       else break;                                              // unknown command: stop, keep what we have
     }
+    out.excl = excl;
     return out;
   }
+  // "sim/exclude_for", "-109.750387/29.286039/-109.748864/29.286972" → merged into zones by rectangle
+  function addExcl(zones, name, val){
+    const m = /^sim\/exclude_([a-z]{3})$/.exec(name || ''); if (!m || !EXCL_OK.has(m[1])) return;
+    const v = String(val).split('/').map(Number); if (v.length !== 4 || !v.every(isFinite)) return;
+    const b = [v[1], v[0], v[3], v[2]];                       // → [south, west, north, east]
+    if (!(b[2] > b[0] && b[3] > b[1])) return;
+    const key = b.map(x => x.toFixed(6)).join('/');
+    let z = zones.find(x => x.key === key); if (!z){ z = { key, b, t: [] }; zones.push(z); }
+    if (!z.t.includes(m[1])) z.t.push(m[1]);
+  }
+  // join zones from several files; drop the internal key
+  const mergeExcl = lists => { const all = []; lists.forEach(l => (l || []).forEach(z => z.t.forEach(t => addExcl(all, 'sim/exclude_' + t, `${z.b[1]}/${z.b[0]}/${z.b[3]}/${z.b[2]}`)))); return all.map(z => ({ b: z.b, t: z.t })); };
 
   // ---------- DSF as text (DSFTool / Scenery Gateway <CODE>.txt) → placed objects (v0.53) ----------
   // Field order per DSFTool's DSF2Text.cpp: OBJECT <def> <lon> <lat> <heading>;
   // OBJECT_AGL|OBJECT_MSL <def> <lon> <lat> <height> <heading>. OBJECT_DEF lines number the definitions from 0.
   function parseDsfText(text){
-    const defs = [], raw = [];
+    const defs = [], raw = [], excl = [];
     for (const line of text.split(/\r?\n/)){
       const t = line.trim().split(/\s+/);
-      if (t[0] === 'OBJECT_DEF') defs.push(t.slice(1).join(' '));
+      if (t[0] === 'PROPERTY') addExcl(excl, t[1], t[2]);     // v0.79
+      else if (t[0] === 'OBJECT_DEF') defs.push(t.slice(1).join(' '));
       else if (t[0] === 'OBJECT') raw.push([+t[1], +t[2], +t[3], +t[4]]);
       else if (t[0] === 'OBJECT_AGL' || t[0] === 'OBJECT_MSL') raw.push([+t[1], +t[2], +t[3], +t[5]]);
     }
-    return raw.filter(r => defs[r[0]] != null && isFinite(r[1]) && isFinite(r[2]))
+    const out = raw.filter(r => defs[r[0]] != null && isFinite(r[1]) && isFinite(r[2]))
       .map(([d, lon, lat, hdg]) => ({ path: defs[d], lat, lon, hdg: isFinite(hdg) ? ((hdg % 360) + 360) % 360 : 0 }));
+    out.excl = excl;
+    return out;
   }
 
   // ---------- read a scenery pack: zip or loose files → { layout } (our own file) or { apt, objs } ----------
@@ -419,12 +468,12 @@
     const aptIt = items.find(it => /(^|\/)apt\.dat$/i.test(it.name)) || items.find(it => /\.dat$/i.test(it.name));   // Gateway: <CODE>.dat
     if (!aptIt) throw new Error('no apt.dat or layout file found in what you chose');
     const apt = parseAptDat(await txt(aptIt));
-    const objs = [], unknown = new Set(), errors = [];
+    const objs = [], unknown = new Set(), errors = [], exclLists = [];
     // a windsock placed as an object (Gateway packs do this) counts as the airport's windsock (v0.54)
-    const place = list => list.forEach(o => { const c = BY_PATH[o.path];
+    const place = list => { exclLists.push(list.excl); list.forEach(o => { const c = BY_PATH[o.path];
       if (c) objs.push({ id: c.id, lat: o.lat, lon: o.lon, hdg: o.hdg });
       else if (/landscape\/windsock/.test(o.path)){ if (!apt.windsock) apt.windsock = [o.lat, o.lon]; }
-      else unknown.add(o.path); });
+      else unknown.add(o.path); }); };
     for (const it of items.filter(it => /\.txt$/i.test(it.name) && !/readme|copying/i.test(it.name))){
       try { const t = await txt(it); if (/^\s*OBJECT_DEF\b/m.test(t) || /^PROPERTY sim\//m.test(t)) place(parseDsfText(t)); } catch (e){ errors.push(it.name.split('/').pop() + ': ' + e.message); }
     }
@@ -432,11 +481,11 @@
       try { place(parseDsf(await it.get())); }
       catch (e){ errors.push(it.name.split('/').pop() + ': ' + e.message); }
     }
-    return { apt, objs, unknown: [...unknown], errors };
+    return { apt, objs, excl: mergeExcl(exclLists), unknown: [...unknown], errors };
   }
   const BY_PATH = {}; CATALOG.forEach(g => g.items.forEach(i => { BY_PATH[i.path] = i; }));
 
-  const api = { CATALOG, BY_ID, BY_PATH, LAYOUT_FILE, aptDat, dsf, md5, zip, pack, ccw, ribbon, dest, brg, dist, unzip, parseAptDat, parseDsf, parseDsfText, readScenery };
+  const api = { CATALOG, BY_ID, BY_PATH, LAYOUT_FILE, EXCL_TYPES, aptDat, dsf, md5, zip, pack, ccw, ribbon, dest, brg, dist, unzip, parseAptDat, parseDsf, parseDsfText, readScenery };
   if (typeof window !== 'undefined') window.XP = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();

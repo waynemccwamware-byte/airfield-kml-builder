@@ -1,0 +1,16 @@
+Mexico has hundreds of remote registered airstrips, Baja and mainland, that don't show up as airports in your EFB or your sim. This free web app takes AFAC's official list and builds a runway, ramp and traffic-pattern overlay plus a named waypoint for ForeFlight, and a ready-to-fly scenery pack for X-Plane. New in the app: a 3D view of each airstrip with visual approaches. Real-world footage: San Pedro de la Cueva, Sonora (SQA).
+
+All GeezerGeek Pilot apps: https://geezer-geek-pilot-control-panel.netlify.app/
+Airfield data: AFAC (Agencia Federal de Aviación Civil), via airports.robrc.net by Roberto Carlos Arce Félix — https://airports.robrc.net
+
+For planning and simulation only. Always confirm an airstrip's status, condition and landing permission before you fly.
+
+0:00 Same airstrip, real vs sim
+0:28 Why these airstrips matter
+1:02 Find the airstrip and fix the runway
+1:39 3D view teaser, then into ForeFlight
+2:13 X-Plane at Scorpion Bay
+3:01 Flying XSBY
+3:16 Caution and thanks
+
+Music: "Ambient Acoustic Guitars Vol. 1" by Sascha Ende (ende.app), CC BY 4.0 — https://ende.app/en/song/13333-ambient-acoustic-guitars-vol-1 — license: https://creativecommons.org/licenses/by/4.0/

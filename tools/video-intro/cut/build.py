@@ -132,10 +132,11 @@ def plan():
     P.append(dict(D=5.8, video=('clip', TAXI, 0.0, ''), natural=(TAXI, 0.0, -18), tag='taxi-out'))
     for n, extra in (('s3-a', [(G / 'to-xsby.png', 2.8, 7.4)]), ('s3-b', []), ('s3-c', []), ('s3-d', []), ('s3-e', []), ('s3-f', [])):
         P.append(dict(D=dur(CAP / f'{n}.mp4'), video=('cap', CAP / f'{n}.mp4', ''), vo=n, overlays=extra, tag=n))
-    # X-Plane XSBY chase view: final + touchdown (~18.3 s), hard cut to taxi-in and stop at the tie-down; readout cropped off the top
-    XSBY = str(U / 'video-clips-sby' / '1080p30' / 'DA40NG_2026-11-21_14.34.33.mp4')
-    P.append(dict(D=12.4, video=('clipcat', XSBY, [(12.0, 19.5), (24.8, 29.7)], f"crop=1806:1016:57:64,scale={W}:{H}"),
-                  natural=(str(pathlib.Path(__file__).parent / 'xsby-sound.wav'), 0.0, -18), vo='s3-g', vo_at=9.0, tag='s3-g X-Plane XSBY landing + tie-down'))
+    # X-Plane XSBY: chase-view landing (14.34.33, 13.0-19.5), cut to the rollout past the big hangar (23.5-26.0), fade to black,
+    # fade up on the ramp taxi to the tie-down (14.29.00, 2.0-8.0); pre-rendered to xsby-shot.mp4 with the readout cropped off
+    HERE = pathlib.Path(__file__).parent
+    P.append(dict(D=15.0, video=('clip', str(HERE / 'xsby-shot.mp4'), 0.0, ''), natural=(str(HERE / 'xsby-sound.wav'), 0.0, -18),
+                  vo='s3-g', vo_at=15.0 - vod('s3-g') - 0.3, tag='s3-g X-Plane XSBY landing + tie-down'))
     # caution VO starts on the split ("…in real life or on the sim"), cuts to the app's disclaimer at the pause after "sim"
     CUT = 8.5
     P.append(dict(D=L + CUT, video=('simsplit', SIMO, 4.7, 0, LAND, 131.5, 0.8, 0.5), natural=(LAND, 131.5, -22), vo='s4-a', vo_at=L, tag='split real/XSQA + caution VO'))
@@ -164,5 +165,5 @@ if __name__ == '__main__':
     ff(['-stream_loop', '1', '-i', MUSIC, '-t', f'{T - m0:.2f}', '-af', f"loudnorm=I=-27:TP=-3:LRA=11,afade=t=in:d=2,afade=t=out:st={T - m0 - 4:.2f}:d=4,adelay={int(m0*1000)}|{int(m0*1000)},apad", '-t', f'{T:.2f}', '-ar', '48000', '-ac', '2', '/home/claude/cut/music.wav'])
     ff(['-i', '/home/claude/cut/body.mp4', '-i', '/home/claude/cut/music.wav', '-filter_complex',
         "[0:a]asplit=2[v1][v2];[1:a][v1]sidechaincompress=threshold=0.02:ratio=6:attack=40:release=600:makeup=1[m];[v2][m]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]",
-        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v11.mp4'])
+        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '/home/claude/cut/mexican-airstrips-rough-v12.mp4'])
     print('total', round(T, 1), 's'); print('\n'.join(f'{a//60:.0f}:{a%60:04.1f}  {b}' for a, b in marks))

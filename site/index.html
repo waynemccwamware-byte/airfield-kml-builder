@@ -2143,7 +2143,7 @@ b{ color:#f5a623; }
       const mid = [(m.rwy.a[0] + m.rwy.b[0]) / 2, (m.rwy.a[1] + m.rwy.b[1]) / 2], half = dist(m.rwy.a, m.rwy.b) / 2000;
       const km = Math.min(3.5, xpVeg.km + half + 0.3);
       // OpenStreetMap roads, buildings, towns (cached by the server a week, and here per page)
-      const url = `/.netlify/functions/osm?veg=1&km=${km.toFixed(1)}&lat=${mid[0].toFixed(5)}&lon=${mid[1].toFixed(5)}`;
+      const url = `/.netlify/functions/osm?veg=1&v=2&km=${km.toFixed(1)}&lat=${mid[0].toFixed(5)}&lon=${mid[1].toFixed(5)}`;
       let osmx = xpVegData.get(url), osmOk = true;
       if (!osmx){ try { const res = await fetch(url); osmx = await res.json(); if (!res.ok || osmx.error || !Array.isArray(osmx.roads)) throw new Error(osmx.error || res.status); xpVegData.set(url, osmx); } catch (e){ osmx = { roads: [], buildings: [], towns: [] }; osmOk = false; } }
       // sea: terrain tiles (the visual approaches' Terrarium tiles), water = 0.5 m or lower

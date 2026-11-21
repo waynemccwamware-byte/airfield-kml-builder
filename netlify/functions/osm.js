@@ -21,7 +21,7 @@ const json = (code, obj, cache) => ({
   headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, cache ? {
     'Cache-Control': 'public, max-age=3600',
     'Netlify-CDN-Cache-Control': 'public, durable, s-maxage=604800',
-    'Netlify-Vary': 'query=lat|lon|veg|km',
+    'Netlify-Vary': 'query=lat|lon|veg|km|v',
   } : { 'Cache-Control': 'no-store' }),
   body: JSON.stringify(obj),
 });

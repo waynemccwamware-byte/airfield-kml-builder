@@ -201,7 +201,9 @@
     box.querySelector('.v3-cau').hidden = !V.length;
     const hud = box.querySelector('.v3-hud');
     const north = box.querySelector('.v3-north');   // v0.82: turns with the view; its arrow always points true north
-    const size = () => { const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+    const cau = box.querySelector('.v3-cau');
+    const place = () => { const t = (cau.hidden ? 0 : cau.offsetTop + cau.offsetHeight) + 8; hud.style.top = (t + 4) + 'px'; north.style.top = t + 'px'; };   // v0.83: below the caution banner, however many lines it wraps to
+    const size = () => { place(); const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
     const ro = new ResizeObserver(size); ro.observe(box);
     setRelief(); overlays(); size(); fly('ov');
     let raf = 0;

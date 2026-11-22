@@ -41,7 +41,8 @@
     close();
     box.innerHTML = `<div class="v3-load">Loading 3-D…</div><div class="v3-cau" hidden><b>Advisory only</b> · for situational awareness · not for navigation</div>
       <div class="v3-ctl"><div class="v3-grp" role="group" aria-label="3-D view"></div><div class="v3-grp" role="group" aria-label="Relief"><button data-ex="1" aria-pressed="true">1×</button><button data-ex="1.5" aria-pressed="false">1.5×</button><button data-ex="2" aria-pressed="false">2×</button></div></div>
-      <div class="v3-hud"></div>`;
+      <div class="v3-hud"></div>
+      <div class="v3-north" title="True north" aria-label="North arrow"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="18" fill="rgba(16,20,26,.72)" stroke="#3a4454"/><path d="M20 9 L25 24 L20 21.5 L15 24 Z" fill="#ff5a4a"/><text x="20" y="35" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-weight="700" font-size="9" fill="#fff">N</text></svg></div>`;
     const status = t => { const el = box.querySelector('.v3-load'); if (el){ el.hidden = !t; el.textContent = t || ''; } };
     const my = S = { box, alive: true };
     try {
@@ -172,7 +173,8 @@
       const midH = Y((hAt(A[0], A[1]) + hAt(B[0], B[1])) / 2);
       controls.target.set(mid[0], midH, mid[1]);
       if (k === 'ov'){
-        const az = rad(340), hd = 4200;   // low oblique from the north-northwest (Wayne's pick on the mockup)
+        // v0.82: low oblique from due south looking north, so 3-D opens north-up like the 2-D map (Wayne; was 340° from the NNW)
+        const az = rad(180), hd = 4200;
         camera.position.set(mid[0] + Math.sin(az) * hd, midH + 1120 * EX, mid[1] - Math.cos(az) * hd);
       } else if (k[0] === 'v'){
         const v = V[+k.slice(1)], c = ptAt(v, 3);
@@ -181,7 +183,16 @@
         const i = +k.slice(1), p = i ? B : A, dir = i ? [-ux, -uz] : [ux, uz], c = [p[0] - dir[0] * 3 * NM, p[1] - dir[1] * 3 * NM];
         camera.position.set(c[0] + dir[1] * 250, Y(hAt(p[0], p[1]) + 15 + 3 * NM * Math.tan(rad(3))) + 120, c[1] - dir[0] * 250);
       }
-      controls.update();
+      clearTerrain(); controls.update();
+    }
+    // v0.82: lift the camera if terrain sits under it or between it and the runway midpoint (150 m clear, scaled with relief)
+    function clearTerrain(){
+      const c = camera.position, t = controls.target, m = 150 * EX; let need = c.y;
+      for (let i = 0; i <= 40; i++){ const f = i / 50;   // stop short of the target: the field itself is at target height
+        const x = c.x + (t.x - c.x) * f, z = c.z + (t.z - c.z) * f;
+        if (Math.abs(x) > half || Math.abs(z) > half) continue;
+        need = Math.max(need, (Y(hAt(x, z)) + m - t.y * f) / (1 - f)); }
+      c.y = need;
     }
     grp.addEventListener('click', e => { const b = e.target.closest('button'); if (b) fly(b.dataset.v); });
     box.querySelectorAll('[data-ex]').forEach(b => b.addEventListener('click', () => {
@@ -189,11 +200,12 @@
       EX = +b.dataset.ex; setRelief(); overlays(); fly(current); }));
     box.querySelector('.v3-cau').hidden = !V.length;
     const hud = box.querySelector('.v3-hud');
+    const north = box.querySelector('.v3-north');   // v0.82: turns with the view; its arrow always points true north
     const size = () => { const w = box.clientWidth, h = box.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
     const ro = new ResizeObserver(size); ro.observe(box);
     setRelief(); overlays(); size(); fly('ov');
     let raf = 0;
-    const loop = () => { if (!my.alive) return; controls.update(); hud.textContent = `eye ${fmt(camera.position.y / EX * FT)}' MSL`; renderer.render(scene, camera); raf = requestAnimationFrame(loop); };
+    const loop = () => { if (!my.alive) return; controls.update(); hud.textContent = `eye ${fmt(camera.position.y / EX * FT)}' MSL`; north.style.transform = `rotate(${(-Math.atan2(controls.target.x - camera.position.x, camera.position.z - controls.target.z)) * 180 / Math.PI}deg)`; renderer.render(scene, camera); raf = requestAnimationFrame(loop); };
     loop();
     my.dispose = () => { cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); renderer.dispose(); };
   }

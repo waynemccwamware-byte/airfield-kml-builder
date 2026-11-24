@@ -14,6 +14,10 @@ taxiways for ForeFlight (User Map Layers). Not for navigation.
 With thanks to [airports.robrc.net](https://airports.robrc.net/), whose public directory of Mexican airport
 infrastructure showed the way to AFAC's data.
 
+## Offline use
+
+This app runs on the web and needs a connection: its maps, AFAC data, runway lookups, terrain checks and pack building all come from the web. Nothing is kept for offline use. Plan on the ground, send the results to ForeFlight or Garmin Pilot, finish the install (ForeFlight: More → Custom Content → Install), and check them in airplane mode before you go. The waypoint's PDF record is a snapshot from the day it was built.
+
 ## X-Plane scenery (step 6, from v0.35)
 
 `site/xplane.js` builds an X-Plane 12 custom-scenery zip in the browser: `<ID> <Name>/Earth nav data/apt.dat` (APT.DAT 1200) plus, when objects from X-Plane's library are placed on the ramp, an overlay DSF. No server function or outside service is involved.

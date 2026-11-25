@@ -37,12 +37,14 @@
     await Promise.all(Array.from({ length: n }, async () => { while (i < items.length){ const k = i++; out[k] = await fn(items[k]); onEach && onEach(++done, items.length); } }));
     return out; }
 
+  // v1.06: Spanish when the page is in Spanish
+  const ES = !!(window.ggpLang && window.ggpLang.es), tx = (en, es) => ES ? es : en;
   async function open(box, data){
     close();
-    box.innerHTML = `<div class="v3-load">Loading 3-D…</div><div class="v3-cau" hidden><b>Advisory only</b> · for situational awareness · not for navigation</div>
-      <div class="v3-ctl"><div class="v3-grp" role="group" aria-label="3-D view"></div><div class="v3-grp" role="group" aria-label="Relief"><button data-ex="1" aria-pressed="true">1×</button><button data-ex="1.5" aria-pressed="false">1.5×</button><button data-ex="2" aria-pressed="false">2×</button></div></div>
+    box.innerHTML = `<div class="v3-load">${tx('Loading 3-D…', 'Cargando 3-D…')}</div><div class="v3-cau" hidden>${tx('<b>Advisory only</b> · for situational awareness · not for navigation', '<b>Solo orientativa</b> · para conciencia situacional · no apta para navegación')}</div>
+      <div class="v3-ctl"><div class="v3-grp" role="group" aria-label="${tx('3-D view', 'Vista 3-D')}"></div><div class="v3-grp" role="group" aria-label="${tx('Relief', 'Relieve')}"><button data-ex="1" aria-pressed="true">1×</button><button data-ex="1.5" aria-pressed="false">1.5×</button><button data-ex="2" aria-pressed="false">2×</button></div></div>
       <div class="v3-hud"></div>
-      <div class="v3-north" title="True north" aria-label="North arrow"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="18" fill="rgba(16,20,26,.72)" stroke="#3a4454"/><path d="M20 9 L25 24 L20 21.5 L15 24 Z" fill="#ff5a4a"/><text x="20" y="35" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-weight="700" font-size="9" fill="#fff">N</text></svg></div>`;
+      <div class="v3-north" title="${tx('True north', 'Norte verdadero')}" aria-label="${tx('North arrow', 'Flecha del norte')}"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="18" fill="rgba(16,20,26,.72)" stroke="#3a4454"/><path d="M20 9 L25 24 L20 21.5 L15 24 Z" fill="#ff5a4a"/><text x="20" y="35" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-weight="700" font-size="9" fill="#fff">N</text></svg></div>`;
     const status = t => { const el = box.querySelector('.v3-load'); if (el){ el.hidden = !t; el.textContent = t || ''; } };
     const my = S = { box, alive: true };
     try {
@@ -53,26 +55,26 @@
       const [x0, y0] = merc(lat0, lon0, Z), [x1, y1] = merc(lat1, lon1, Z);
       const tx0 = Math.floor(x0), tx1 = Math.floor(x1), ty0 = Math.floor(y0), ty1 = Math.floor(y1);
       const list = []; for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) list.push([x, y]);
-      status(`Loading terrain… 0 of ${list.length}`);
-      const tt = await pool(list, 6, ([x, y]) => terrainTile(x, y), (d, n) => my.alive && status(`Loading terrain… ${d} of ${n}`));
+      status(ES ? `Cargando terreno… 0 de ${list.length}` : `Loading terrain… 0 of ${list.length}`);
+      const tt = await pool(list, 6, ([x, y]) => terrainTile(x, y), (d, n) => my.alive && status(ES ? `Cargando terreno… ${d} de ${n}` : `Loading terrain… ${d} of ${n}`));
       if (!my.alive) return;
       const T = {}; list.forEach(([x, y], i) => T[x + '/' + y] = tt[i]);
       const elevM = (lat, lon) => { const [fx, fy] = merc(lat, lon, Z), tx = Math.floor(fx), ty = Math.floor(fy), t = T[tx + '/' + ty]; if (!t) return 0;
         const px = (fx - tx) * t.w - .5, py = (fy - ty) * t.h - .5, i = Math.max(0, Math.min(t.w - 2, Math.floor(px))), j = Math.max(0, Math.min(t.h - 2, Math.floor(py)));
         const u = Math.max(0, Math.min(1, px - i)), v = Math.max(0, Math.min(1, py - j)), g = (a, b) => t.a[b * t.w + a];
         return g(i,j)*(1-u)*(1-v) + g(i+1,j)*u*(1-v) + g(i,j+1)*(1-u)*v + g(i+1,j+1)*u*v; };
-      status(`Loading imagery… 0 of ${list.length}`);
-      const ims = await pool(list, 8, ([x, y]) => imageTile(x, y), (d, n) => my.alive && status(`Loading imagery… ${d} of ${n}`));
+      status(ES ? `Cargando imágenes… 0 de ${list.length}` : `Loading imagery… 0 of ${list.length}`);
+      const ims = await pool(list, 8, ([x, y]) => imageTile(x, y), (d, n) => my.alive && status(ES ? `Cargando imágenes… ${d} de ${n}` : `Loading imagery… ${d} of ${n}`));
       if (!my.alive) return;
       const W = (tx1 - tx0 + 1) * 256, H = (ty1 - ty0 + 1) * 256, cv = document.createElement('canvas');
       const K = Math.min(1, 4096 / Math.max(W, H)); cv.width = Math.round(W * K); cv.height = Math.round(H * K);
       const cx = cv.getContext('2d'); cx.fillStyle = '#6b6252'; cx.fillRect(0, 0, cv.width, cv.height);
       list.forEach(([x, y], i) => { if (ims[i]) cx.drawImage(ims[i], (x - tx0) * 256 * K, (y - ty0) * 256 * K, 256 * K + 1, 256 * K + 1); });
-      status('Building the terrain…');
+      status(tx('Building the terrain…', 'Armando el terreno…'));
       build(my, data, { C, half, dLat, dLon, elevM, cv, tx0, ty0, tx1, ty1 });
       status('');
     } catch(err){
-      if (my.alive) status('3-D view unavailable: ' + (err && err.message || err) + '. Back to 2-D and try again.');
+      if (my.alive) status(tx('3-D view unavailable: ', 'Vista 3-D no disponible: ') + (err && err.message || err) + tx('. Back to 2-D and try again.', '. Vuelve a 2-D e intenta de nuevo.'));
     }
   }
 
@@ -156,16 +158,16 @@
         if (v.warn){ const H = toXZ(v.warn.p), top = v.warn.terrFt / FT, g = hAt(H[0], H[1]), c = ptAt(v, v.warn.d), pathY = Y(altM(v, v.warn.d));
           over.add(tube([[H[0], Y(Math.min(g, top)) - 5, H[1]], [H[0], Y(Math.max(g, top)) + 40, H[1]]], 0xe0705f, 18));
           over.add(tube([[H[0], Y(top), H[1]], [c[0], pathY, c[1]]], 0xe0705f, 4));
-          over.add(label(v.warn.c >= 0 ? `terrain ${v.warn.d} NM · ${fmt(r10(v.warn.c))}' below path` : `terrain ${v.warn.d} NM · ${fmt(r10(-v.warn.c))}' above path`, '#ff8a75', H[0], Y(Math.max(g, top)) + 60, H[1])); }
+          over.add(label(v.warn.c >= 0 ? (ES ? `terreno ${v.warn.d} NM · ${fmt(r10(v.warn.c))}' bajo la trayectoria` : `terrain ${v.warn.d} NM · ${fmt(r10(v.warn.c))}' below path`) : (ES ? `terreno ${v.warn.d} NM · ${fmt(r10(-v.warn.c))}' sobre la trayectoria` : `terrain ${v.warn.d} NM · ${fmt(r10(-v.warn.c))}' above path`), '#ff8a75', H[0], Y(Math.max(g, top)) + 60, H[1])); }
         if (v.pen != null){ const c = ptAt(v, v.pen), g = hAt(c[0], c[1]); over.add(tube([[c[0], Y(g) - 5, c[1]], [c[0], Y(g) + 150, c[1]]], 0xe0705f, 18));
-          over.add(label(`terrain ${v.pen} NM: line ends`, '#ff8a75', c[0], Y(g) + 170, c[1])); }
+          over.add(label(ES ? `terreno ${v.pen} NM: termina la línea` : `terrain ${v.pen} NM: line ends`, '#ff8a75', c[0], Y(g) + 170, c[1])); }
       });
     }
 
     // views: every one turns around the runway midpoint (Wayne)
     const grp = box.querySelector('.v3-grp');
-    const views = [['ov', 'Airstrip'], ...V.map((v, i) => ['v' + i, `RWY ${v.id} final`])];
-    if (!V.length) [[data.labA, A, [ux, uz]], [data.labB, B, [-ux, -uz]]].forEach(([id, p, dir], i) => views.push(['r' + i, `RWY ${id || (i ? 'end B' : 'end A')} final`]));
+    const views = [['ov', tx('Airstrip', 'Pista')], ...V.map((v, i) => ['v' + i, ES ? `final RWY ${v.id}` : `RWY ${v.id} final`])];
+    if (!V.length) [[data.labA, A, [ux, uz]], [data.labB, B, [-ux, -uz]]].forEach(([id, p, dir], i) => views.push(['r' + i, ES ? `final RWY ${id || (i ? 'extremo B' : 'extremo A')}` : `RWY ${id || (i ? 'end B' : 'end A')} final`]));
     grp.innerHTML = views.map(([k, t], i) => `<button data-v="${k}" aria-pressed="${i === 0}">${t}</button>`).join('');
     let current = 'ov';
     function fly(k){
@@ -207,7 +209,7 @@
     const ro = new ResizeObserver(size); ro.observe(box);
     setRelief(); overlays(); size(); fly('ov');
     let raf = 0;
-    const loop = () => { if (!my.alive) return; controls.update(); hud.textContent = `eye ${fmt(camera.position.y / EX * FT)}' MSL`; north.style.transform = `rotate(${(-Math.atan2(controls.target.x - camera.position.x, camera.position.z - controls.target.z)) * 180 / Math.PI}deg)`; renderer.render(scene, camera); raf = requestAnimationFrame(loop); };
+    const loop = () => { if (!my.alive) return; controls.update(); hud.textContent = `${tx('eye', 'ojo')} ${fmt(camera.position.y / EX * FT)}' MSL`; north.style.transform = `rotate(${(-Math.atan2(controls.target.x - camera.position.x, camera.position.z - controls.target.z)) * 180 / Math.PI}deg)`; renderer.render(scene, camera); raf = requestAnimationFrame(loop); };
     loop();
     my.dispose = () => { cancelAnimationFrame(raf); ro.disconnect(); controls.dispose(); scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material){ if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); renderer.dispose(); };
   }
